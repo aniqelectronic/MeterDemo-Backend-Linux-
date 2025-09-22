@@ -1,0 +1,12 @@
+fastapi 
+uvicorn
+pydantic
+sqlalchemy
+pytz
+python-dotenv
+sqlalchemy 
+pymysql
+requests
+weasyprint
+fpdf
+qrcode[pil]

@@ -1,0 +1,150 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from datetime import timedelta
+from app.db.database import get_db
+from app.models.parking.parking_models import Parking, PaymentStatusEnum
+from app.utils.Malaysia_time import malaysia_now
+from app.models.parking.transaction_parking_model import TransactionParking, TransactionTypeEnum
+from app.schemas.parking.parking_schema import (
+    ParkingCheck,
+    ParkingCreate,
+    ParkingExtend,
+    ParkingResponse
+)
+
+router = APIRouter(prefix="/parking", tags=["Parking"])
+
+# -------------------------
+# Pricing Logic
+# -------------------------
+RATE_PER_HOUR = 0.60   # ✅ 1 hour = RM0.60
+
+def calculate_amount(hours: float) -> float:  
+    """Convert parking hours into RM amount."""
+    return round(hours * RATE_PER_HOUR, 2)
+
+# -------------------------
+# CRUD Logic
+# -------------------------
+
+
+def get_latest_paid(db: Session, plate: str):
+    return (
+        db.query(Parking)
+        .filter(Parking.plate == plate, Parking.payment_status == PaymentStatusEnum.yes)  
+        .order_by(Parking.timeout.desc())
+        .first()
+    )
+
+
+def check_active_parking(db: Session, plate: str):
+    now = malaysia_now()
+    latest = get_latest_paid(db, plate)
+    if latest and now < latest.timeout:
+        return latest
+    return None
+
+
+def add_new_parking(db: Session, plate: str, time_used: float):
+    now = malaysia_now()
+    timeout = now + timedelta(hours=time_used)
+    amount=calculate_amount(time_used),   
+    
+    new_parking = Parking(
+        plate=plate, 
+        time_used=time_used,
+        timein=now,
+        timeout=timeout,
+        payment_status=PaymentStatusEnum.yes,
+        amount=amount,
+    )
+    db.add(new_parking)
+    db.commit()
+    db.refresh(new_parking)
+    
+    # ✅ Add transaction
+    last_tx = db.query(TransactionParking).order_by(TransactionParking.id.desc()).first()
+    next_ticket = f"P-{(last_tx.id + 1) if last_tx else 1:04d}"
+    transaction = TransactionParking(
+        ticket_id=next_ticket,
+        plate=plate,
+        hours=time_used,
+        amount=amount,
+        transaction_type=TransactionTypeEnum.new
+    )
+    db.add(transaction)
+    db.commit()
+    db.refresh(transaction)
+    return new_parking
+
+# ✅ changed parking_id -> plate
+def extend_parking(db: Session, plate: str, hours: float):
+    active = check_active_parking(db, plate)
+    if not active:
+        raise HTTPException(status_code=404, detail="No active paid parking to extend")
+
+    # Maintain timein, update timeout and time_used
+    active.time_used += hours
+    active.timeout += timedelta(hours=hours)
+    active.amount = calculate_amount(active.time_used)
+    db.commit()
+    db.refresh(active)
+
+    # ✅ Add transaction
+    last_tx = db.query(TransactionParking).order_by(TransactionParking.id.desc()).first()
+    next_ticket = f"P-{(last_tx.id + 1) if last_tx else 1:04d}"
+    transaction = TransactionParking(
+        ticket_id=next_ticket,
+        plate=plate,
+        hours=hours,
+        amount=calculate_amount(hours),
+        transaction_type=TransactionTypeEnum.extend
+    )
+    db.add(transaction)
+    db.commit()
+    db.refresh(transaction)
+
+    return active
+
+def get_all_parkings(db: Session):
+    return db.query(Parking).all()
+
+# -------------------------
+# Endpoints
+# -------------------------
+
+@router.post("/check", response_model=ParkingResponse)
+def check_parking(parking: ParkingCheck, db: Session = Depends(get_db)):
+    """
+    Check if plate exists and is active (within timeout).
+    """
+    active = check_active_parking(db, parking.plate)  
+    if active:
+        return active
+    raise HTTPException(status_code=404, detail="Plate not active or new, proceed to payment")
+
+@router.post("/pay", response_model=ParkingResponse)
+def pay_parking(parking: ParkingCreate, db: Session = Depends(get_db)):
+    """
+    Pay for new parking. Will create new record only if no active paid parking exists.
+    """
+    active = check_active_parking(db, parking.plate)  
+    if active:
+        raise HTTPException(status_code=400, detail=f"Parking already active until {active.timeout}")
+    return add_new_parking(db, parking.plate, parking.time_used)  
+
+# ✅ changed path param name from parking_id -> plate
+@router.put("/{plate}/extend", response_model=ParkingResponse)
+def extend(plate: str, extend: ParkingExtend, db: Session = Depends(get_db)):
+    """
+    Extend an active paid parking.
+    """
+    return extend_parking(db, plate, extend.extend_hours)  
+
+@router.get("/", response_model=list[ParkingResponse])
+def get_all(db: Session = Depends(get_db)):
+    """
+    Get all parking records.
+    """
+    return get_all_parkings(db)
+
