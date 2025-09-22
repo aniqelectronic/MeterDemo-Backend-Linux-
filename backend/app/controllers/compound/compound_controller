@@ -1,0 +1,21 @@
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from app.db.database import get_db
+from app.models.compound import compound_models
+from app.schemas.compound.compound_schema import CompoundCreate, CompoundResponse
+
+router = APIRouter(prefix="/compound", tags=["Compound"])
+
+# --- Create compound ---
+@router.post("/", response_model=CompoundResponse)
+def create_compound(compound: CompoundCreate, db: Session = Depends(get_db)):
+    new_compound = compound_models(**compound.dict())
+    db.add(new_compound)
+    db.commit()
+    db.refresh(new_compound)
+    return new_compound
+
+# --- Get all compounds ---
+@router.get("/", response_model=list[CompoundResponse])
+def get_compounds(db: Session = Depends(get_db)):
+    return db.query(compound_models).all()
