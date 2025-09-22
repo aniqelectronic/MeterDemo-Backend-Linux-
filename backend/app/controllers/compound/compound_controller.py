@@ -7,6 +7,19 @@ from app.schemas.compound.compound_schema import CompoundCreate, CompoundRespons
 router = APIRouter(prefix="/compound", tags=["Compound"])
 
 # --- Create compound ---
+
+   
+  # this is how to post data (for dummy test only)
+  # {
+   #  "compoundnum": "MBMBCMP2025000123",
+   #  "plate": "ABC1234",
+   # "date": "2025-09-22",
+   #  "time": "15:45:00",
+   #  "offense": "Illegal Parking",
+   #  "amount": 50.0
+ #   }
+   
+   
 @router.post("/", response_model=CompoundResponse)
 def create_compound(compound: CompoundCreate, db: Session = Depends(get_db)):
     new_compound = Compound(**compound.dict())
