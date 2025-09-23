@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends , HTTPException
 from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.models.compound.compound_models import Compound
@@ -32,3 +32,11 @@ def create_compound(compound: CompoundCreate, db: Session = Depends(get_db)):
 @router.get("/", response_model=list[CompoundResponse])
 def get_compounds(db: Session = Depends(get_db)):
     return db.query(Compound).all()
+  
+  # ✅ Get single compound by ID
+@router.get("/{compound_id}", response_model=CompoundResponse)
+def get_compound(compound_id: str, db: Session = Depends(get_db)):
+    compound = db.query(Compound).filter(Compound.compoundnum == compound_id).first()
+    if not compound:
+        raise HTTPException(status_code=404, detail="Compound not found")
+    return compound
