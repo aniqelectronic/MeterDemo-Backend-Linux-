@@ -1,14 +1,21 @@
-from sqlalchemy import Column, Integer, String, Float
-from app.db.database import Base
+from pydantic import BaseModel
 
-class Tax(Base):
-    __tablename__ = "taxes"
+class TaxBase(BaseModel):
+    taxnum: str
+    taxtype: str
+    owner_id: int
+    property_id: int
+    year: int
+    amount: float
+    status: str   # "unpaid" / "paid"
 
-    id = Column(Integer, primary_key=True, index=True)
-    taxnum = Column(String(30), unique=True, index=True)   # e.g. TAX2025000123
-    taxtype = Column(String(50), nullable=False)           # e.g. "property", "income"
-    owner_id = Column(Integer, nullable=False)
-    property_id = Column(Integer, nullable=False)
-    year = Column(Integer, nullable=False)
-    amount = Column(Float, nullable=False)
-    status = Column(String(20), nullable=False, default="unpaid")  # "unpaid" or "paid"
+
+#Just reusing all fields from TaxBase
+class TaxCreate(TaxBase):
+    pass
+
+class TaxResponse(TaxBase):
+    id: int
+
+    class Config:
+        from_attributes = True   # ✅ for Pydantic v2

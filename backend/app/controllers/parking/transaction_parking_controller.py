@@ -4,10 +4,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, cast , Integer
 from fastapi.responses import HTMLResponse, FileResponse , StreamingResponse
 from app.db.database import get_db
-from app.models.parking.transaction_parking_model import TransactionParking
-from app.schemas.parking.transaction_parking_schema import TransactionResponse
+from app.schema.parking.transaction_parking_schema import TransactionParking
+from app.models.parking.transaction_parking_model import TransactionResponse
 
-from app.models.parking.parking_models import Parking
+from app.schema.parking.parking_schema import Parking
 
 
 from fpdf import FPDF

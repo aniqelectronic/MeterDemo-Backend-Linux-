@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from app.db.database import get_db
-from app.models.parking.parking_models import Parking, PaymentStatusEnum
+from app.schema.parking.parking_schema import Parking, PaymentStatusEnum
 from app.utils.Malaysia_time import malaysia_now
-from app.models.parking.transaction_parking_model import TransactionParking, TransactionTypeEnum
-from app.schemas.parking.parking_schema import (
+from app.schema.parking.transaction_parking_schema import TransactionParking, TransactionTypeEnum
+from app.models.parking.parking_model import (
     ParkingCheck,
     ParkingCreate,
     ParkingExtend,

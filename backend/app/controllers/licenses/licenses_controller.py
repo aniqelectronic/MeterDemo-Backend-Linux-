@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.database import get_db
-from app.models.licenses.licenses_model import License
-from app.schemas.licenses.licenses_schema import LicenseCreate, LicenseResponse
+from app.schema.licenses.licenses_schema import License
+from app.models.licenses.licenses_model import LicenseCreate, LicenseResponse
 
 router = APIRouter(prefix="/license", tags=["License"])
 

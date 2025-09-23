@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends , HTTPException
 from sqlalchemy.orm import Session
 from app.db.database import get_db
-from app.models.compound.compound_models import Compound
-from app.schemas.compound.compound_schema import CompoundCreate, CompoundResponse
+from app.schema.compound.compound_schema import Compound
+from app.models.compound.compound_model import CompoundCreate, CompoundResponse
 
 router = APIRouter(prefix="/compound", tags=["Compound"])
 
