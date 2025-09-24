@@ -1,6 +1,12 @@
 from pydantic import BaseModel
 from datetime import date, time
+from enum import Enum
 
+
+class StatusTypeEnum(str, Enum):
+    paid = "PAID"
+    unpaid = "UNPAID"
+    
 class CompoundBase(BaseModel):
     compoundnum: str
     plate: str
@@ -8,6 +14,7 @@ class CompoundBase(BaseModel):
     time: time
     offense: str
     amount: float
+    status: StatusTypeEnum
 
 class CompoundCreate(CompoundBase):
     pass
