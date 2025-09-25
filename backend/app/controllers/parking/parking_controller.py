@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException 
+from fastapi.responses import HTMLResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from app.db.database import get_db
@@ -11,6 +12,13 @@ from app.models.parking.parking_model import (
     ParkingExtend,
     ParkingResponse
 )
+
+import qrcode
+from io import BytesIO
+
+# ----------------- CONFIG -----------------
+BASE_IP = "192.168.0.100"  # <-- change only this if IP changes
+BASE_URL = f"http://{BASE_IP}:8000"  # used for receipt URLs
 
 router = APIRouter(prefix="/parking", tags=["Parking"])
 
@@ -123,6 +131,17 @@ def check_parking(parking: ParkingCheck, db: Session = Depends(get_db)):
         return active
     raise HTTPException(status_code=404, detail="Plate not active or new, proceed to payment")
 
+# New GET endpoint (easier for Java)
+@router.get("/check/{plate}", response_model=ParkingResponse)
+def check_parking_by_plate(plate: str, db: Session = Depends(get_db)):
+    """
+    Check parking by plate number directly in path.
+    """
+    active = check_active_parking(db, plate)
+    if active:
+        return active
+    raise HTTPException(status_code=404, detail="Plate not active or new, proceed to payment")
+
 @router.post("/pay", response_model=ParkingResponse)
 def pay_parking(parking: ParkingCreate, db: Session = Depends(get_db)):
     """
@@ -148,3 +167,52 @@ def get_all(db: Session = Depends(get_db)):
     """
     return get_all_parkings(db)
 
+
+@router.get("/html/qrdummy/{plate}", response_class=HTMLResponse)
+def qr_page(plate: str):
+    return f"""
+    <html>
+    <body style='text-align:center;margin-top:200px;'>
+        <h1>Parking Payment</h1>
+        <p>Plate: {plate}</p>
+        <button style='font-size:30px;padding:20px;'
+            onclick="fetch('/parking/pay', {{
+                method:'POST',
+                headers: {{ 'Content-Type': 'application/json' }},
+                body: JSON.stringify({{ plate: '{plate}', time_used: 1 }})
+            }}).then(()=>alert('Payment Successful!'));"
+        >
+            PAY
+        </button>
+    </body>
+    </html>
+    """
+
+
+# ---------------- Create dummy qr code payment image ----------------
+
+@router.get("/qrdummy/{plate}")
+def generate_receipt_qr(plate: str, db: Session = Depends(get_db)):
+    """
+    Generate a QR code for the receipt URL stored in DB.
+    """
+    # Use stored URL or generate if missing
+    receipt_url =  f"{BASE_URL}/parking/html/qrdummy/{plate}"
+
+    # Generate QR code
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(receipt_url)
+    qr.make(fit=True)
+
+    # Convert to image in memory
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+
+    return StreamingResponse(buf, media_type="image/png")

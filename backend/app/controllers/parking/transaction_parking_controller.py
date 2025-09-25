@@ -36,8 +36,6 @@ def get_all_transactions(db: Session = Depends(get_db)):
     return transactions
 
 
-
-
 # ---------------- RECEIPT (HTML PAGE) ----------------
 @router.get("/receipt/view/{ticket_id}", response_class=HTMLResponse)
 def view_receipt(ticket_id: str, db: Session = Depends(get_db)):

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.schema.compound.compound_schema import Compound
 from app.models.compound.compound_model import CompoundCreate, CompoundResponse, StatusTypeEnum
-
+import qrcode
 
 # ----------------- CONFIG -----------------
 BASE_IP = "192.168.0.100"  # <-- change only this if IP changes
@@ -228,6 +228,52 @@ def get_latest_compound_qr(db: Session = Depends(get_db)):
     qr.add_data(receipt_url)
     qr.make(fit=True)
 
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+
+    return StreamingResponse(buf, media_type="image/png")
+
+
+@router.get("/html/qrdummy/{compoundnum}", response_class=HTMLResponse)
+def qr_page(compoundnum: str):
+    return f"""
+    <html>
+    <body style='text-align:center;margin-top:200px;'>
+        <h1>Compound Payment</h1>
+        <p>Compound No: {compoundnum}</p>
+        <button style='font-size:30px;padding:20px;'
+            onclick="fetch('/compound/pay/{compoundnum}', {{ method:'POST' }})
+            .then(()=>alert('Payment Successful!'));"
+        >
+            PAY
+        </button>
+    </body>
+    </html>
+    """
+
+# ---------------- Create dummy qr code payment image ----------------
+
+@router.get("/qrdummy/{compoundnum}")
+def generate_receipt_qr(compoundnum: str, db: Session = Depends(get_db)):
+    """
+    Generate a QR code for the receipt URL stored in DB.
+    """
+    # Use stored URL or generate if missing
+    receipt_url =  f"{BASE_URL}/compound/html/qrdummy/{compoundnum}"
+
+    # Generate QR code
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(receipt_url)
+    qr.make(fit=True)
+
+    # Convert to image in memory
     img = qr.make_image(fill_color="black", back_color="white")
     buf = BytesIO()
     img.save(buf, format="PNG")
