@@ -201,22 +201,19 @@ def generate_compound_receipt_qr(compoundnum: str, db: Session = Depends(get_db)
 
     return StreamingResponse(buffer, media_type="image/png")
 
-# ---------------- GET LATEST COMPOUND QR CODE ----------------
-@router.get("/latest/qr")
-def get_latest_compound_qr(db: Session = Depends(get_db)):
+
+# ---------------- GET COMPOUND QR CODE BY COMPNUM ----------------
+@router.get("/latest/qr/{compnum}")
+def get_compound_qr(compnum: str, db: Session = Depends(get_db)):
     """
-    Get the latest compound and return its QR code (PNG).
+    Get a specific compound's QR code by compnum (PNG).
     """
-    tx = db.query(Compound).order_by(Compound.id.desc()).first()
+    tx = db.query(Compound).filter(Compound.compoundnum == compnum).first()
     if not tx:
-        raise HTTPException(status_code=404, detail="No compounds found")
+        raise HTTPException(status_code=404, detail=f"Compound {compnum} not found")
 
     # Always refresh receipt URL
     receipt_url = f"{BASE_URL}/compound/receipt/view/{tx.compoundnum}"
-    # If you want to store receipt_url inside DB, uncomment this part
-    # if tx.receipt_url != receipt_url:
-    #     tx.receipt_url = receipt_url
-    #     db.commit()
 
     # Generate QR code
     qr = qrcode.QRCode(
@@ -234,6 +231,7 @@ def get_latest_compound_qr(db: Session = Depends(get_db)):
     buf.seek(0)
 
     return StreamingResponse(buf, media_type="image/png")
+
 
 
 @router.get("/html/qrdummy/{compoundnum}", response_class=HTMLResponse)
