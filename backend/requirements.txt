@@ -10,3 +10,4 @@ requests
 weasyprint
 fpdf
 qrcode[pil]
+cryptography
