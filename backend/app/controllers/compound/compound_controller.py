@@ -73,7 +73,7 @@ def get_compound(compound_id: str, db: Session = Depends(get_db)):
     return compound
   
 
-# ================= RECEIPT (HTML PAGE) =================
+# ================= COMPOUND RECEIPT (HTML PAGE) =================
 @router.get("/receipt/view/{compoundnum}", response_class=HTMLResponse)
 def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
     compound = db.query(Compound).filter(Compound.compoundnum == compoundnum).first()
@@ -84,45 +84,80 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
     <html>
         <head>
             <title>Compound E-Receipt</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.5">
             <style>
                 body {{
                     font-family: Arial, sans-serif;
-                    margin: 30px;
-                    padding: 20px;
-                    background: #f9f9f9;
+                    margin: 0;
+                    padding: 0;
+                    background: #f0f0f0;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    height: 100vh;
                 }}
                 .receipt {{
                     background: white;
-                    padding: 20px;
-                    border-radius: 10px;
-                    box-shadow: 0 0 10px rgba(0,0,0,0.1);
-                    max-width: 400px;
+                    padding: 60px;
+                    border-radius: 20px;
+                    box-shadow: 0 0 30px rgba(0,0,0,0.2);
+                    width: 700px;
+                    font-size: 32px;     /* 🔹 Bigger text for kiosk display */
+                    line-height: 1.6;
                 }}
-                h2 {{ color: #333; }}
-                p {{ margin: 6px 0; }}
+                h2 {{
+                    color: #111;
+                    text-align: center;
+                    font-size: 40px;      /* 🔹 Big header */
+                    margin-bottom: 40px;
+                    letter-spacing: 1px;
+                }}
+                p {{
+                    margin: 12px 0;
+                    font-size: 30px;      /* 🔹 Larger paragraph text */
+                }}
                 .thankyou {{
-                    margin-top: 20px;
-                    font-size: 16px;
+                    margin-top: 40px;
+                    font-size: 36px;      /* 🔹 Large thank-you message */
                     font-weight: bold;
                     text-align: center;
+                    color: #2a7a2a;
                 }}
                 .footer {{
-                    margin-top: 20px;
-                    font-size: 12px;
+                    margin-top: 40px;
+                    font-size: 22px;
                     color: gray;
+                    text-align: center;
                 }}
                 .download-btn {{
                     display: block;
-                    width: 100%;
                     text-align: center;
-                    margin-top: 15px;
+                    margin-top: 35px;
                 }}
                 .download-btn a {{
                     text-decoration: none;
                     background-color: #4CAF50;
                     color: white;
-                    padding: 10px 20px;
-                    border-radius: 5px;
+                    padding: 20px 50px;
+                    font-size: 28px;       /* 🔹 Large button */
+                    border-radius: 10px;
+                    transition: 0.2s;
+                }}
+                .download-btn a:hover {{
+                    background-color: #45a049;
+                }}
+                @media print {{
+                    body {{
+                        background: white;
+                    }}
+                    .receipt {{
+                        box-shadow: none;
+                        border: none;
+                        width: 100%;
+                        font-size: 28px;
+                        padding: 30px;
+                    }}
+                    .download-btn {{ display: none; }}
                 }}
             </style>
         </head>
@@ -134,22 +169,27 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
                 <p><b>Date:</b> {compound.date}</p>
                 <p><b>Time:</b> {compound.time}</p>
                 <p><b>Offense:</b> {compound.offense}</p>
-                <p><b>Amount:</b> RM {compound.amount:.2f}</p>
-                <div class="thankyou">Thank you for your payment!</div>
-
-                <!-- PDF download button -->
+                <p><b>Amount:</b> 
+                    <span style="font-size:38px; font-weight:bold; color:#000;">
+                        RM {compound.amount:.2f}
+                    </span>
+                </p>
+    
+                <div class="thankyou">Thank you for your payment 💳</div>
+    
                 <div class="download-btn">
                     <a href="/compound/receipt/pdf/{compound.compoundnum}" target="_blank">
                         Download PDF
                     </a>
                 </div>
-
+    
                 <div class="footer">Generated by Parking System</div>
             </div>
         </body>
     </html>
     """
     return HTMLResponse(content=html)
+
 
 
 # ================= RECEIPT PDF =================

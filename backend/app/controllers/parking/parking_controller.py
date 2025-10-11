@@ -168,8 +168,8 @@ def get_all(db: Session = Depends(get_db)):
     return get_all_parkings(db)
 
 
-@router.get("/html/qrdummy/{plate}", response_class=HTMLResponse)
-def qr_page(plate: str):
+@router.get("/html/qrdummy/{plate}/{hours}", response_class=HTMLResponse)
+def qr_page(plate: str, hours: int):
     return f"""
     <html>
     <body style='text-align:center;margin-top:200px;'>
@@ -179,7 +179,7 @@ def qr_page(plate: str):
             onclick="fetch('/parking/pay', {{
                 method:'POST',
                 headers: {{ 'Content-Type': 'application/json' }},
-                body: JSON.stringify({{ plate: '{plate}', time_used: 1 }})
+                body: JSON.stringify({{ plate: '{plate}', time_used: {hours}}})
             }}).then(()=>alert('Payment Successful!'));"
         >
             PAY
@@ -191,13 +191,13 @@ def qr_page(plate: str):
 
 # ---------------- Create dummy qr code payment image ----------------
 
-@router.get("/qrdummy/{plate}")
-def generate_receipt_qr(plate: str, db: Session = Depends(get_db)):
+@router.get("/qrdummy/{plate}/{hours}")
+def generate_receipt_qr(plate: str, hours: int, db: Session = Depends(get_db)):
     """
     Generate a QR code for the receipt URL stored in DB.
     """
     # Use stored URL or generate if missing
-    receipt_url =  f"{BASE_URL}/parking/html/qrdummy/{plate}"
+    receipt_url =  f"{BASE_URL}/parking/html/qrdummy/{plate}/{hours}"
 
     # Generate QR code
     qr = qrcode.QRCode(

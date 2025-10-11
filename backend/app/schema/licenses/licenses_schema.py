@@ -1,13 +1,16 @@
-from sqlalchemy import Column, Integer, String, Float
+from sqlalchemy import Column, String, Integer, Float, Date, Enum
 from app.db.database import Base
+from app.models.licenses.licenses_model import StatusTypeEnum
 
 class License(Base):
     __tablename__ = "licenses"
 
     id = Column(Integer, primary_key=True, index=True)
-    licensenum = Column(String(30), unique=True, index=True)   # e.g. LIC2025000123
-    licensetype = Column(String(50), nullable=False)           # e.g. "business", "driver"
-    owner_id = Column(Integer, nullable=False)
-    year = Column(Integer, nullable=False)
-    amount = Column(Float, nullable=False)
-    status = Column(String(20), nullable=False, default="unpaid")  # "unpaid" or "paid"
+    licensenum = Column(String(30), unique=True, index=True)  # add length
+    licensetype = Column(String(50))                                # add length
+    owner_id = Column(String(50))                                   # add length
+    year = Column(Integer)
+    amount = Column(Float)
+    status = Column(Enum(StatusTypeEnum), default=StatusTypeEnum.unpaid, nullable=False)
+    start_date = Column(Date, nullable=True)
+    end_date = Column(Date, nullable=True)
