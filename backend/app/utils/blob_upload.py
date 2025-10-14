@@ -9,7 +9,7 @@ from azure.storage.blob import ContentSettings
 load_dotenv()
 
 # Read from .env
-AZURE_STORAGE_CONNECTION = os.getenv("AZURE_STORAGE_CONNECTION")
+AZURE_STORAGE_CONNECTION = "DefaultEndpointsProtocol=https;AccountName=vsmeterblob;AccountKey=rKu+/oWQtOQZLJ+/4RgJXKpXt3itshA38M88LX4nYE3ScM8e1BAqry708bCae0G2BQhExxyjR489+AStb/amEA==;EndpointSuffix=core.windows.net"
 ACCOUNT_NAME = "vsmeterblob"
 CONTAINER_NAME = "receipts"
 
