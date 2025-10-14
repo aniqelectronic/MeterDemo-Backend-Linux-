@@ -9,7 +9,7 @@ from azure.storage.blob import ContentSettings
 load_dotenv()
 
 # Read from .env
-AZURE_STORAGE_CONNECTION = os.getenv("DefaultEndpointsProtocol")
+AZURE_STORAGE_CONNECTION = os.getenv("AZURE_STORAGE_CONNECTION")
 ACCOUNT_NAME = "vsmeterblob"
 CONTAINER_NAME = "receipts"
 
