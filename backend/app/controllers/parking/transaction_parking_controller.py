@@ -6,6 +6,8 @@ from fastapi.responses import HTMLResponse, FileResponse , StreamingResponse
 from app.db.database import get_db
 from app.schema.parking.transaction_parking_schema import TransactionParking
 from app.models.parking.transaction_parking_model import TransactionResponse
+from app.utils.blob_upload import upload_to_blob
+
 
 
 
@@ -155,7 +157,14 @@ def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
         </body>
     </html>
     """
-    return HTMLResponse(content=html)
+    html_bytes = html.encode("utf-8")
+    filename = f"receipt_{transaction.ticket_id}.html"
+    html_url = upload_to_blob(filename, html_bytes, content_type="text/html")
+
+    transaction.receipt_url = html_url
+    db.commit()
+
+    return {"receipt_url": html_url}
 
 # ---------------- RECEIPT PDF ----------------
 from fastapi.responses import StreamingResponse
@@ -187,15 +196,19 @@ def download_receipt_pdf(ticket_id: str, db: Session = Depends(get_db)):
     pdf.cell(0, 8, f"Amount: RM {transaction.amount:.2f}", ln=True)
     pdf.cell(0, 8, f"Transaction Type: {tx_type}", ln=True)
     pdf.ln(10)
-    pdf.cell(0, 10, "Thank you!! Drive safely ", ln=True, align="C")
+    pdf.cell(0, 10, "Thank you!! Drive safely", ln=True, align="C")
 
-    # write PDF into memory instead of saving
-    pdf_bytes = pdf.output(dest="S").encode("latin1")  # get PDF as bytes
-    buffer = io.BytesIO(pdf_bytes)
+    pdf_bytes = pdf.output(dest="S").encode("latin1")
 
-    return StreamingResponse(buffer, media_type="application/pdf", headers={
-        "Content-Disposition": f"inline; filename=receipt_{transaction.ticket_id}.pdf"
-    })
+    # Upload to Azure
+    filename = f"receipt_{transaction.ticket_id}.pdf"
+    receipt_url = upload_to_blob(filename, pdf_bytes, content_type="application/pdf")
+
+    transaction.receipt_url = receipt_url
+    db.commit()
+
+    return {"receipt_url": receipt_url}
+
 
 # ---------------- QR CODE ----------------
 """"
@@ -286,25 +299,103 @@ def get_transaction_by_ticket(ticket_id: str, db: Session = Depends(get_db)):
 @router.get("/latest/qr")
 def get_latest_qr(db: Session = Depends(get_db)):
     """
-    Get the latest transaction and return its QR code (PNG).
+    Get the latest transaction and return its QR code (PNG),
+    pointing to the Azure Blob receipt URL (publicly accessible).
     """
+
     tx = db.query(TransactionParking).order_by(TransactionParking.id.desc()).first()
     if not tx:
         raise HTTPException(status_code=404, detail="No transactions found")
 
-    # Always refresh receipt URL
-    receipt_url = f"{BASE_URL}/transactions/receipt/view/{tx.ticket_id}"
-    if tx.receipt_url != receipt_url:
-        tx.receipt_url = receipt_url
-        db.commit()
+    # ✅ Always regenerate blob receipt if not found or still using VM IP
+    if not tx.receipt_url or "blob.core.windows.net" not in tx.receipt_url:
+        parking = db.query(Parking).filter(Parking.plate == tx.plate).order_by(Parking.id.desc()).first()
+        tx_type = tx.transaction_type.value if tx.transaction_type else "N/A"
 
-    # Generate QR code
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
-    )
+        html = f"""
+        <html>
+            <head>
+                <title>Parking E-Receipt</title>
+                <style>
+                    body {{
+                        font-family: Arial, sans-serif;
+                        margin: 0;
+                        padding: 0;
+                        background: #f0f0f0;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        height: 100vh;
+                    }}
+                    .receipt {{
+                        background: white;
+                        padding: 60px;
+                        border-radius: 20px;
+                        box-shadow: 0 0 30px rgba(0,0,0,0.2);
+                        width: 700px;
+                        font-size: 32px;
+                        line-height: 1.6;
+                    }}
+                    h2 {{
+                        color: #111;
+                        text-align: center;
+                        font-size: 40px;
+                        margin-bottom: 40px;
+                        letter-spacing: 1px;
+                    }}
+                    p {{
+                        margin: 12px 0;
+                        font-size: 30px;
+                    }}
+                    .thankyou {{
+                        margin-top: 40px;
+                        font-size: 36px;
+                        font-weight: bold;
+                        text-align: center;
+                        color: #2a7a2a;
+                    }}
+                    .footer {{
+                        margin-top: 40px;
+                        font-size: 22px;
+                        color: gray;
+                        text-align: center;
+                    }}
+                </style>
+            </head>
+            <body>
+                <div class="receipt">
+                    <h2>Parking E-Receipt</h2>
+                    <p><b>Ticket ID:</b> {tx.ticket_id}</p>
+                    <p><b>Plate:</b> {tx.plate}</p>
+                    <p><b>Time Purchased (Hours):</b> {tx.hours}</p>
+                    <p><b>Time In:</b> {parking.timein if parking else "N/A"}</p>
+                    <p><b>Time Out:</b> {parking.timeout if parking else "N/A"}</p>
+                    <p><b>Amount:</b> 
+                        <span style="font-size:38px; font-weight:bold; color:#000;">
+                            RM {tx.amount:.2f}
+                        </span>
+                    </p>
+                    <p><b>Transaction Type:</b> {tx_type}</p>
+                    <div class="thankyou">Thank you! Drive safely 🚗</div>
+                    <div class="footer">Generated by Parking System</div>
+                </div>
+            </body>
+        </html>
+        """
+
+        html_bytes = html.encode("utf-8")
+        filename = f"receipt_{tx.ticket_id}.html"
+        html_url = upload_to_blob(filename, html_bytes, content_type="text/html")
+
+        tx.receipt_url = html_url
+        db.commit()
+        print(f"✅ Uploaded to Azure Blob: {html_url}")
+    else:
+        print(f"ℹ️ Using existing blob URL: {tx.receipt_url}")
+
+    # Generate QR for Blob URL
+    receipt_url = tx.receipt_url
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
     qr.add_data(receipt_url)
     qr.make(fit=True)
 
@@ -314,6 +405,8 @@ def get_latest_qr(db: Session = Depends(get_db)):
     buf.seek(0)
 
     return StreamingResponse(buf, media_type="image/png")
+
+
 
 
 # ---------------- LATEST RECEIPT BY PLATE ----------------

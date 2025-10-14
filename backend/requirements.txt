@@ -11,3 +11,4 @@ weasyprint
 fpdf
 qrcode[pil]
 cryptography
+azure-storage-blob
