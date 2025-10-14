@@ -12,8 +12,13 @@ from app.controllers.licenses import licenses_controller
 Base.metadata.create_all(bind=engine) # recreate with new columns
 app = FastAPI(debug=True)
 
-# Allow frontend to access API
-origins = ["http://localhost:3000"]
+origins = [
+    "http://localhost:3000",        # local development frontend
+    "http://4.194.122.32",          # VM backend
+    "http://4.194.122.32:3000",     # optional frontend hosted on same VM
+    "*"                             # allow IoT or external testing
+]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,

@@ -12,8 +12,7 @@ from app.models.compound.compound_model import CompoundCreate, CompoundResponse,
 import qrcode
 
 # ----------------- CONFIG -----------------
-BASE_IP = "192.168.0.100"  # <-- change only this if IP changes
-BASE_URL = f"http://{BASE_IP}:8000"  # used for receipt URLs
+from app.utils.config import BASE_URL
 
 router = APIRouter(prefix="/compound", tags=["Compound"])
 

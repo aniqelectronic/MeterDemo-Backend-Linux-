@@ -7,6 +7,8 @@ from app.db.database import get_db
 from app.schema.parking.transaction_parking_schema import TransactionParking
 from app.models.parking.transaction_parking_model import TransactionResponse
 
+
+
 from app.schema.parking.parking_schema import Parking
 
 
@@ -16,8 +18,7 @@ import qrcode
 from io import BytesIO
 
 # ----------------- CONFIG -----------------
-BASE_IP = "192.168.0.100"  # <-- change only this if IP changes
-BASE_URL = f"http://{BASE_IP}:8000"  # used for receipt URLs
+from app.utils.config import BASE_URL
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 

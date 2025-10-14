@@ -7,11 +7,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DB_TYPE = os.getenv("DB_TYPE", "mysql")
-DB_USER = os.getenv("DB_USER", "root")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "141201")
-DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
+DB_USER = os.getenv("DB_USER", "kioskuser")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "Afm%40141201")
+DB_HOST = os.getenv("DB_HOST", "4.194.122.32 ")
 DB_PORT = os.getenv("DB_PORT", "3306")
-DB_NAME = os.getenv("DB_NAME", "parking_db")
+DB_NAME = os.getenv("DB_NAME", "kioskdb")
 
 # Proper SQLAlchemy URL
 DATABASE_URL = f"{DB_TYPE}+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"

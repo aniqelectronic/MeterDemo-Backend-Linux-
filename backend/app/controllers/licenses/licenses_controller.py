@@ -11,8 +11,7 @@ from io import BytesIO
 from datetime import date, timedelta
 
 # ----------------- CONFIG -----------------
-BASE_IP = "192.168.0.100"   # same IP config as compound
-BASE_URL = f"http://{BASE_IP}:8000"
+from app.utils.config import BASE_URL
 
 router = APIRouter(prefix="/license", tags=["License"])
 
