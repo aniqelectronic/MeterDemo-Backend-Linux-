@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from azure.storage.blob import BlobServiceClient, generate_blob_sas, BlobSasPermissions
 from dotenv import load_dotenv
 from mimetypes import guess_type
+from azure.storage.blob import ContentSettings
 
 # Load .env
 load_dotenv()
@@ -31,7 +32,11 @@ def upload_to_blob(filename: str, content: bytes, content_type: str = None):
     # Upload
     blob_client = container_client.get_blob_client(filename)
     content_type = content_type or guess_type(filename)[0] or "application/octet-stream"
-    blob_client.upload_blob(content, overwrite=True, content_settings={"content_type": content_type})
+    blob_client.upload_blob(
+        content,
+        overwrite=True,
+        content_settings=ContentSettings(content_type=content_type)
+    )
 
     # Generate temporary SAS URL (24h)
     sas_token = generate_blob_sas(
