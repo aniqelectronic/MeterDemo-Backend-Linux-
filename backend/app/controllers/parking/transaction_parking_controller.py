@@ -205,8 +205,7 @@ def download_receipt_pdf(ticket_id: str, db: Session = Depends(get_db)):
     receipt_url = upload_to_blob(filename, pdf_bytes, content_type="application/pdf")
 
     # Return SAS link (frontend can redirect to it)
-    return JSONResponse({
-        "message": "Receipt uploaded successfully",
+    return ({
         "download_url": receipt_url
     })
 
