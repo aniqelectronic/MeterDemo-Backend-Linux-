@@ -16,6 +16,8 @@ from app.models.parking.parking_model import (
 import qrcode
 from io import BytesIO
 
+from app.utils.blob_upload import upload_to_blob
+
 # ----------------- CONFIG -----------------
 from app.utils.config import BASE_URL
 
@@ -167,9 +169,9 @@ def get_all(db: Session = Depends(get_db)):
     return get_all_parkings(db)
 
 
-@router.get("/html/qrdummy/{plate}/{hours}", response_class=HTMLResponse)
+@router.get("/qrdummy/{plate}/{hours}", response_class=HTMLResponse)
 def qr_page(plate: str, hours: int):
-    return f"""
+    html = f"""
     <html>
     <body style='text-align:center;margin-top:200px;'>
         <h1>Parking Payment</h1>
@@ -186,32 +188,20 @@ def qr_page(plate: str, hours: int):
     </body>
     </html>
     """
-
-
-# ---------------- Create dummy qr code payment image ----------------
-
-@router.get("/qrdummy/{plate}/{hours}")
-def generate_receipt_qr(plate: str, hours: int, db: Session = Depends(get_db)):
-    """
-    Generate a QR code for the receipt URL stored in DB.
-    """
-    # Use stored URL or generate if missing
-    receipt_url =  f"{BASE_URL}/parking/html/qrdummy/{plate}/{hours}"
-
-    # Generate QR code
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
-    )
+    html_bytes = html.encode("utf-8")
+    filename = f"qrdummy_{plate}.html"
+    html_url = upload_to_blob(filename, html_bytes, content_type="text/html")
+    
+        # Generate QR for Blob URL
+    receipt_url = html_url
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
     qr.add_data(receipt_url)
     qr.make(fit=True)
 
-    # Convert to image in memory
     img = qr.make_image(fill_color="black", back_color="white")
     buf = BytesIO()
     img.save(buf, format="PNG")
     buf.seek(0)
 
     return StreamingResponse(buf, media_type="image/png")
+
