@@ -171,31 +171,50 @@ def get_all(db: Session = Depends(get_db)):
 
 @router.get("/qrdummy/{plate}/{hours}", response_class=HTMLResponse)
 def qr_page(plate: str, hours: int):
+    # HTML page that will be uploaded to blob
     html = f"""
     <html>
     <body style='text-align:center;margin-top:200px;'>
         <h1>Parking Payment</h1>
         <p>Plate: {plate}</p>
         <button style='font-size:30px;padding:20px;'
-            onclick="fetch('http://4.194.122.32:8000/parking/pay', {{
-                method:'POST',
-                headers: {{ 'Content-Type': 'application/json' }},
-                body: JSON.stringify({{ plate: '{plate}', time_used: {hours}}})
-            }}).then(()=>alert('Payment Successful!'));"
+            onclick="
+                fetch('{BASE_URL}/parking/pay', {{
+                    method:'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ plate: '{plate}', time_used: {hours} }})
+                }})
+                .then(response => {{
+                    if(response.ok) {{
+                        alert('Payment Successful!');
+                    }} else {{
+                        alert('Payment failed: ' + response.statusText);
+                    }}
+                }})
+                .catch(error => {{
+                    alert('Error: ' + error);
+                }});
+            "
         >
             PAY
         </button>
     </body>
     </html>
     """
+
+    # Upload HTML to blob storage
     html_bytes = html.encode("utf-8")
     filename = f"qrdummy_{plate}.html"
     html_url = upload_to_blob(filename, html_bytes, content_type="text/html")
-    
-    # Generate QR for Blob URL
-    receipt_url = html_url
-    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
-    qr.add_data(receipt_url)
+
+    # Generate QR code for blob URL
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(html_url)
     qr.make(fit=True)
 
     img = qr.make_image(fill_color="black", back_color="white")
@@ -204,4 +223,5 @@ def qr_page(plate: str, hours: int):
     buf.seek(0)
 
     return StreamingResponse(buf, media_type="image/png")
+
 
