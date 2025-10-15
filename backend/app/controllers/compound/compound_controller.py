@@ -74,8 +74,8 @@ def get_compound(compound_id: str, db: Session = Depends(get_db)):
     return compound
   
 
-# ================= COMPOUND RECEIPT (HTML PAGE) =================
-@router.get("/receipt/view/{compoundnum}", response_class=HTMLResponse)
+# ================= COMPOUND RECEIPT QR =================
+@router.get("/receipt/qr/{compoundnum}")
 def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
     compound = db.query(Compound).filter(Compound.compoundnum == compoundnum).first()
     if not compound:
@@ -215,47 +215,9 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
     # ✅ Upload to Azure Blob
     blob_url = upload_to_blob(filename, html_bytes, content_type="text/html")
     
-    return {"receipt_url": blob_url}
-
-    
-# ================= COMPOUND RECEIPT QR =================
-@router.get("/receipt/qr/{compoundnum}")
-def generate_compound_receipt_qr(compoundnum: str, db: Session = Depends(get_db)):
-    compound = db.query(Compound).filter(Compound.compoundnum == compoundnum).first()
-    if not compound:
-        raise HTTPException(status_code=404, detail="Compound not found")
-
-    # This QR points to the HTML receipt page
-    receipt_url = f"{BASE_URL}/compound/receipt/view/{compound.compoundnum}"
-
-    qr = qrcode.make(receipt_url)
-    buffer = io.BytesIO()
-    qr.save(buffer, format="PNG")
-    buffer.seek(0)
-
-    return StreamingResponse(buffer, media_type="image/png")
-
-
-# ---------------- GET COMPOUND QR CODE BY COMPNUM ----------------
-@router.get("/latest/qr/{compnum}")
-def get_compound_qr(compnum: str, db: Session = Depends(get_db)):
-    """
-    Get a specific compound's QR code by compnum (PNG).
-    """
-    tx = db.query(Compound).filter(Compound.compoundnum == compnum).first()
-    if not tx:
-        raise HTTPException(status_code=404, detail=f"Compound {compnum} not found")
-
-    # Always refresh receipt URL
-    receipt_url = f"{BASE_URL}/compound/receipt/view/{tx.compoundnum}"
-
-    # Generate QR code
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
-    )
+        # Generate QR for Blob URL
+    receipt_url = blob_url
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
     qr.add_data(receipt_url)
     qr.make(fit=True)
 
@@ -265,9 +227,8 @@ def get_compound_qr(compnum: str, db: Session = Depends(get_db)):
     buf.seek(0)
 
     return StreamingResponse(buf, media_type="image/png")
-
-
-
+    
+    
 @router.get("/html/qrdummy/{compoundnum}", response_class=HTMLResponse)
 def qr_page(compoundnum: str):
     return f"""

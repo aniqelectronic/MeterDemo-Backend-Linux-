@@ -171,7 +171,7 @@ from fastapi.responses import StreamingResponse
 import io
 from fpdf import FPDF
 
-# ---------------- QR CODE ----------------
+# ---------------- QR CODE SPECIFIC PLATE NUMBER----------------
 """"
 This will give you the Qr code for the receipt of the ticket id that you given 
 example in postman :
@@ -181,6 +181,7 @@ Get http://192.168.22.15:8000/transactions/receipt/qr/P-0006
 so it will give the specific P-0006 ticket qr code
 
 """
+
 @router.get("/receipt/qr/{ticket_id}")
 def generate_receipt_qr(ticket_id: str, db: Session = Depends(get_db)):
     """

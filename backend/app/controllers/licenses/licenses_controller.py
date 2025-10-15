@@ -101,7 +101,7 @@ def get_license(license_id: str, db: Session = Depends(get_db)):
 
 
 # ================= LICENSE RECEIPT (HTML PAGE) =================
-@router.get("/receipt/view/{licensenum}", response_class=HTMLResponse)
+@router.get("/receipt/qr/{licensenum}", response_class=HTMLResponse)
 def view_license_receipt(licensenum: str, db: Session = Depends(get_db)):
     license_obj = db.query(License).filter(License.licensenum == licensenum).first()
     if not license_obj:
@@ -206,23 +206,19 @@ def view_license_receipt(licensenum: str, db: Session = Depends(get_db)):
     # ✅ Upload to Azure Blob
     blob_url = upload_to_blob(filename, html_bytes, content_type="text/html")
     
-    return {"url": blob_url}
+        # Generate QR for Blob URL
+    receipt_url = blob_url
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
+    qr.add_data(receipt_url)
+    qr.make(fit=True)
 
-# ================= LICENSE RECEIPT QR =================
-@router.get("/receipt/qr/{licensenum}")
-def generate_license_receipt_qr(licensenum: str, db: Session = Depends(get_db)):
-    license_obj = db.query(License).filter(License.licensenum == licensenum).first()
-    if not license_obj:
-        raise HTTPException(status_code=404, detail="License not found")
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
 
-    receipt_url = f"{BASE_URL}/license/receipt/view/{license_obj.licensenum}"
+    return StreamingResponse(buf, media_type="image/png")
 
-    qr = qrcode.make(receipt_url)
-    buffer = io.BytesIO()
-    qr.save(buffer, format="PNG")
-    buffer.seek(0)
-
-    return StreamingResponse(buffer, media_type="image/png")
 
 # ================= LICENSE QR DUMMY PAYMENT =================
 @router.get("/html/qrdummy/{licensenum}", response_class=HTMLResponse)
