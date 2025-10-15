@@ -120,7 +120,7 @@ def view_license_receipt(licensenum: str, db: Session = Depends(get_db)):
     pdf.cell(0, 8, f"Year: {license_obj.year}", ln=True)
     pdf.cell(0, 8, f"Owner ID: {license_obj.owner_id}", ln=True)
     pdf.cell(0, 8, f"Amount: RM {license_obj.amount:.2f}", ln=True)
-    pdf.cell(0, 8, f"Status: {license_obj.status}", ln=True)
+    pdf.cell(0, 8, f"Status: {license_obj.status.value if license_obj.status else 'N/A'}", ln=True)
     pdf.cell(0, 8, f"Start Date: {license_obj.start_date}", ln=True)
     pdf.cell(0, 8, f"End Date: {license_obj.end_date}", ln=True)
     pdf.ln(10)
@@ -224,7 +224,7 @@ def view_license_receipt(licensenum: str, db: Session = Depends(get_db)):
                         RM {license_obj.amount:.2f}
                     </span>
                 </p>
-                <p><b>Status:</b> {license_obj.status}</p>
+                <p><b>Status:</b> {license_obj.status.value if license_obj.status else 'N/A'}</p>
                 <p><b>Start Date:</b> {license_obj.start_date}</p>
                 <p><b>End Date:</b> {license_obj.end_date}</p>
     
