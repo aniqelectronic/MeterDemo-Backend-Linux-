@@ -192,7 +192,7 @@ def qr_page(plate: str, hours: int):
     filename = f"qrdummy_{plate}.html"
     html_url = upload_to_blob(filename, html_bytes, content_type="text/html")
     
-        # Generate QR for Blob URL
+    # Generate QR for Blob URL
     receipt_url = html_url
     qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
     qr.add_data(receipt_url)
