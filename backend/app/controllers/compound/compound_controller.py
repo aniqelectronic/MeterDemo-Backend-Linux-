@@ -11,6 +11,8 @@ from app.schema.compound.compound_schema import Compound
 from app.models.compound.compound_model import CompoundCreate, CompoundResponse, StatusTypeEnum
 import qrcode
 
+from app.utils.blob_upload import upload_to_blob
+
 # ----------------- CONFIG -----------------
 from app.utils.config import BASE_URL
 
@@ -63,7 +65,7 @@ def pay_compound(compoundnum: str, db: Session = Depends(get_db)):
 def get_compounds(db: Session = Depends(get_db)):
     return db.query(Compound).all()
   
-  # ✅ Get single compound by ID
+# ---------------- GET ONE ----------------
 @router.get("/{compound_id}", response_model=CompoundResponse)
 def get_compound(compound_id: str, db: Session = Depends(get_db)):
     compound = db.query(Compound).filter(Compound.compoundnum == compound_id).first()
@@ -174,7 +176,7 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
                     </span>
                 </p>
     
-                <div class="thankyou">Thank you for your payment 💳</div>
+                <div class="thankyou">Thank you for your payment </div>
     
                 <div class="download-btn">
                     <a href="/compound/receipt/pdf/{compound.compoundnum}" target="_blank">
@@ -187,8 +189,14 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
         </body>
     </html>
     """
-    return HTMLResponse(content=html)
+    
+    html_bytes = html.encode("utf-8")
+    filename = f"compound_{compound.compoundnum}.html"
 
+    # ✅ Upload to Azure Blob
+    blob_url = upload_to_blob(filename, html_bytes, content_type="text/html")
+    
+    return {"message": "Uploaded successfully", "url": blob_url}
 
 
 # ================= RECEIPT PDF =================

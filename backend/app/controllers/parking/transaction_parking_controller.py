@@ -144,7 +144,7 @@ def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
                 </p>
                 <p><b>Transaction Type:</b> {tx_type}</p>
     
-                <div class="thankyou">Thank you! Drive safely 🚗</div>
+                <div class="thankyou">Thank you! Drive safely </div>
     
                 <div class="download-btn">
                     <a href="/transactions/receipt/pdf/{transaction.ticket_id}" target="_blank">
@@ -297,12 +297,15 @@ def get_transaction_by_ticket(ticket_id: str, db: Session = Depends(get_db)):
 
 # ---------------- GET LATEST QR CODE ----------------
 @router.get("/latest/qr")
-def get_latest_qr(db: Session = Depends(get_db)):
+def get_latest_qr(ticket_id: str,db: Session = Depends(get_db)):
     """
     Get the latest transaction and return its QR code (PNG),
     pointing to the Azure Blob receipt URL (publicly accessible).
     """
-
+    transaction = db.query(TransactionParking).filter(TransactionParking.ticket_id == ticket_id).first()
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+        
     tx = db.query(TransactionParking).order_by(TransactionParking.id.desc()).first()
     if not tx:
         raise HTTPException(status_code=404, detail="No transactions found")
@@ -333,23 +336,23 @@ def get_latest_qr(db: Session = Depends(get_db)):
                         border-radius: 20px;
                         box-shadow: 0 0 30px rgba(0,0,0,0.2);
                         width: 700px;
-                        font-size: 32px;
+                        font-size: 32px;    /* 🔹 Bigger text */
                         line-height: 1.6;
                     }}
                     h2 {{
                         color: #111;
                         text-align: center;
-                        font-size: 40px;
+                        font-size: 40px;     /* 🔹 Large heading */
                         margin-bottom: 40px;
                         letter-spacing: 1px;
                     }}
                     p {{
                         margin: 12px 0;
-                        font-size: 30px;
+                        font-size: 30px;     /* 🔹 Bigger paragraph text */
                     }}
                     .thankyou {{
                         margin-top: 40px;
-                        font-size: 36px;
+                        font-size: 36px;     /* 🔹 Large thank-you message */
                         font-weight: bold;
                         text-align: center;
                         color: #2a7a2a;
@@ -360,29 +363,66 @@ def get_latest_qr(db: Session = Depends(get_db)):
                         color: gray;
                         text-align: center;
                     }}
+                    .download-btn {{
+                        display: block;
+                        text-align: center;
+                        margin-top: 35px;
+                    }}
+                    .download-btn a {{
+                        text-decoration: none;
+                        background-color: #4CAF50;
+                        color: white;
+                        padding: 20px 50px;
+                        font-size: 28px;      /* 🔹 Larger button */
+                        border-radius: 10px;
+                        transition: 0.2s;
+                    }}
+                    .download-btn a:hover {{
+                        background-color: #45a049;
+                    }}
+                    @media print {{
+                        body {{
+                            background: white;
+                        }}
+                        .receipt {{
+                            box-shadow: none;
+                            border: none;
+                            width: 100%;
+                            font-size: 28px;
+                            padding: 30px;
+                        }}
+                        .download-btn {{ display: none; }}
+                    }}
                 </style>
             </head>
             <body>
                 <div class="receipt">
                     <h2>Parking E-Receipt</h2>
-                    <p><b>Ticket ID:</b> {tx.ticket_id}</p>
-                    <p><b>Plate:</b> {tx.plate}</p>
-                    <p><b>Time Purchased (Hours):</b> {tx.hours}</p>
+                    <p><b>Ticket ID:</b> {transaction.ticket_id}</p>
+                    <p><b>Plate:</b> {transaction.plate}</p>
+                    <p><b>Time Purchased (Hours):</b> {transaction.hours}</p>
                     <p><b>Time In:</b> {parking.timein if parking else "N/A"}</p>
                     <p><b>Time Out:</b> {parking.timeout if parking else "N/A"}</p>
                     <p><b>Amount:</b> 
                         <span style="font-size:38px; font-weight:bold; color:#000;">
-                            RM {tx.amount:.2f}
+                            RM {transaction.amount:.2f}
                         </span>
                     </p>
                     <p><b>Transaction Type:</b> {tx_type}</p>
-                    <div class="thankyou">Thank you! Drive safely 🚗</div>
+        
+                    <div class="thankyou">Thank you! Drive safely </div>
+        
+                    <div class="download-btn">
+                        <a href="/transactions/receipt/pdf/{transaction.ticket_id}" target="_blank">
+                            Download PDF
+                        </a>
+                    </div>
+        
                     <div class="footer">Generated by Parking System</div>
                 </div>
             </body>
         </html>
         """
-
         html_bytes = html.encode("utf-8")
         filename = f"receipt_{tx.ticket_id}.html"
         html_url = upload_to_blob(filename, html_bytes, content_type="text/html")

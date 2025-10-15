@@ -1,17 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
 from sqlalchemy.orm import Session
-from app.db.database import get_db
-from app.schema.licenses.licenses_schema import License
-from app.models.licenses.licenses_model import LicenseCreate, LicenseResponse, StatusTypeEnum
 from fpdf import FPDF
 import io
 import qrcode
 from io import BytesIO
 from datetime import date, timedelta
+from app.utils.blob_upload import upload_to_blob
+
 
 # ----------------- CONFIG -----------------
+from app.db.database import get_db
 from app.utils.config import BASE_URL
+from app.schema.licenses.licenses_schema import License
+from app.models.licenses.licenses_model import LicenseCreate, LicenseResponse, StatusTypeEnum
 
 router = APIRouter(prefix="/license", tags=["License"])
 
@@ -177,7 +179,13 @@ def view_license_receipt(licensenum: str, db: Session = Depends(get_db)):
         </body>
     </html>
     """
-    return HTMLResponse(content=html)
+    html_bytes = html.encode("utf-8")
+    filename = f"compound_{license_obj.licensenum}.html"
+
+    # ✅ Upload to Azure Blob
+    blob_url = upload_to_blob(filename, html_bytes, content_type="text/html")
+    
+    return {"message": "Uploaded successfully", "url": blob_url}
 
 
 # ================= LICENSE RECEIPT PDF =================
