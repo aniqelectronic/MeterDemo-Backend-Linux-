@@ -171,45 +171,6 @@ from fastapi.responses import StreamingResponse
 import io
 from fpdf import FPDF
 
-@router.get("/receipt/pdf/{ticket_id}")
-def download_receipt_pdf(ticket_id: str, db: Session = Depends(get_db)):
-    transaction = db.query(TransactionParking).filter(TransactionParking.ticket_id == ticket_id).first()
-    if not transaction:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-
-    parking = db.query(Parking).filter(Parking.plate == transaction.plate).order_by(Parking.id.desc()).first()
-    tx_type = transaction.transaction_type.value if transaction.transaction_type else "N/A"
-
-    # Create PDF in memory
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(0, 10, "Parking E-Receipt", ln=True, align="C")
-    pdf.ln(5)
-
-    pdf.set_font("Arial", '', 12)
-    pdf.cell(0, 8, f"Ticket ID: {transaction.ticket_id}", ln=True)
-    pdf.cell(0, 8, f"Plate: {transaction.plate}", ln=True)
-    pdf.cell(0, 8, f"Time Purchased (Hours): {transaction.hours}", ln=True)
-    pdf.cell(0, 8, f"Time In: {parking.timein if parking else 'N/A'}", ln=True)
-    pdf.cell(0, 8, f"Time Out: {parking.timeout if parking else 'N/A'}", ln=True)
-    pdf.cell(0, 8, f"Amount: RM {transaction.amount:.2f}", ln=True)
-    pdf.cell(0, 8, f"Transaction Type: {tx_type}", ln=True)
-    pdf.ln(10)
-    pdf.cell(0, 10, "Thank you!! Drive safely", ln=True, align="C")
-
-    pdf_bytes = pdf.output(dest="S").encode("latin1")
-
-    # Upload to Azure Blob Storage
-    filename = f"receipt_{transaction.ticket_id}.pdf"
-    receipt_url = upload_to_blob(filename, pdf_bytes, content_type="application/pdf")
-
-    # Return SAS link (frontend can redirect to it)
-    return ({
-        "download_url": receipt_url
-    })
-
-
 # ---------------- QR CODE ----------------
 """"
 This will give you the Qr code for the receipt of the ticket id that you given 
@@ -311,6 +272,27 @@ def get_latest_qr(db: Session = Depends(get_db)):
         parking = db.query(Parking).filter(Parking.plate == tx.plate).order_by(Parking.id.desc()).first()
         tx_type = tx.transaction_type.value if tx.transaction_type else "N/A"
 
+        # ✅ Generate PDF first
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", 'B', 16)
+        pdf.cell(0, 10, "Parking E-Receipt", ln=True, align="C")
+        pdf.ln(10)
+        pdf.set_font("Arial", '', 12)
+        pdf.cell(0, 8, f"Ticket ID: {tx.ticket_id}", ln=True)
+        pdf.cell(0, 8, f"Plate: {tx.plate}", ln=True)
+        pdf.cell(0, 8, f"Time Purchased (Hours): {tx.hours}", ln=True)
+        pdf.cell(0, 8, f"Time In: {parking.timein if parking else 'N/A'}", ln=True)
+        pdf.cell(0, 8, f"Time Out: {parking.timeout if parking else 'N/A'}", ln=True)
+        pdf.cell(0, 8, f"Amount: RM {tx.amount:.2f}", ln=True)
+        pdf.cell(0, 8, f"Transaction Type: {tx_type}", ln=True)
+        pdf.ln(10)
+        pdf.cell(0, 10, "Thank you!! Drive safely", ln=True, align="C")
+
+        pdf_bytes = pdf.output(dest="S").encode("latin1")
+        pdf_filename = f"receipt_{tx.ticket_id}.pdf"
+        pdf_url = upload_to_blob(pdf_filename, pdf_bytes, content_type="application/pdf")
+        
         html = f"""
         <html>
             <head>
@@ -409,7 +391,7 @@ def get_latest_qr(db: Session = Depends(get_db)):
                     <div class="thankyou">Thank you! Drive safely </div>
         
                     <div class="download-btn">
-                        <a href="/transactions/receipt/pdf/{tx.ticket_id}" target="_blank">
+                        <a href="{pdf_url}" target="_blank">
                             Download PDF
                         </a>
                     </div>
