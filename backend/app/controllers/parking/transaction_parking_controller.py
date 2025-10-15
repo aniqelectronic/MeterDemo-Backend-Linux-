@@ -199,15 +199,14 @@ def download_receipt_pdf(ticket_id: str, db: Session = Depends(get_db)):
     pdf.cell(0, 10, "Thank you!! Drive safely", ln=True, align="C")
 
     pdf_bytes = pdf.output(dest="S").encode("latin1")
-
+    buffer = io.BytesIO(pdf_bytes)
     # Upload to Azure
-    filename = f"receipt_{transaction.ticket_id}.pdf"
-    receipt_url = upload_to_blob(filename, pdf_bytes, content_type="application/pdf")
+    #filename = f"receipt_{transaction.ticket_id}.pdf"
+    #receipt_url = upload_to_blob(filename, pdf_bytes, content_type="application/pdf")
 
-    transaction.receipt_url = receipt_url
-    db.commit()
-
-    return {"receipt_url": receipt_url}
+    return StreamingResponse(buffer, media_type="application/pdf", headers={
+        "Content-Disposition": f"inline; filename=compound_{transaction.ticket_id}.pdf"
+    })
 
 
 # ---------------- QR CODE ----------------
@@ -306,9 +305,7 @@ def get_latest_qr(ticket_id: str,db: Session = Depends(get_db)):
     if not transaction:
         raise HTTPException(status_code=404, detail="Ticket not found")
         
-    tx = db.query(TransactionParking).order_by(TransactionParking.id.desc()).first()
-    if not tx:
-        raise HTTPException(status_code=404, detail="No transactions found")
+    tx = transaction
 
     # ✅ Always regenerate blob receipt if not found or still using VM IP
     if not tx.receipt_url or "blob.core.windows.net" not in tx.receipt_url:

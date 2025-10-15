@@ -192,11 +192,11 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
     
     html_bytes = html.encode("utf-8")
     filename = f"compound_{compound.compoundnum}.html"
-
+    
     # ✅ Upload to Azure Blob
     blob_url = upload_to_blob(filename, html_bytes, content_type="text/html")
     
-    return {"message": "Uploaded successfully", "url": blob_url}
+    return {"receipt_url": blob_url}
 
 
 # ================= RECEIPT PDF =================
@@ -225,6 +225,10 @@ def download_compound_receipt_pdf(compoundnum: str, db: Session = Depends(get_db
     # write PDF into memory
     pdf_bytes = pdf.output(dest="S").encode("latin1")
     buffer = io.BytesIO(pdf_bytes)
+    
+        # Upload to Azure
+    #filename = f"receipt_{Compound.compoundnum}.pdf"
+    #receipt_url = upload_to_blob(filename, pdf_bytes, content_type="application/pdf")
 
     return StreamingResponse(buffer, media_type="application/pdf", headers={
         "Content-Disposition": f"inline; filename=compound_{compound.compoundnum}.pdf"
