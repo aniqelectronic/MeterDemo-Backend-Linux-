@@ -104,63 +104,64 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
     <html>
         <head>
             <title>Compound E-Receipt</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1.5">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
                 body {{
                     font-family: Arial, sans-serif;
                     margin: 0;
                     padding: 0;
-                    background: #f0f0f0;
+                    background: #f5f5f5;
                     display: flex;
                     justify-content: center;
                     align-items: center;
-                    height: 100vh;
+                    min-height: 100vh;
                 }}
                 .receipt {{
                     background: white;
-                    padding: 60px;
-                    border-radius: 20px;
-                    box-shadow: 0 0 30px rgba(0,0,0,0.2);
-                    width: 700px;
-                    font-size: 32px;     /* 🔹 Bigger text for kiosk display */
+                    padding: 30px 40px;
+                    border-radius: 15px;
+                    box-shadow: 0 0 15px rgba(0,0,0,0.1);
+                    width: 90%;
+                    max-width: 600px;
+                    font-size: 18px;
                     line-height: 1.6;
                 }}
                 h2 {{
                     color: #111;
                     text-align: center;
-                    font-size: 40px;      /* 🔹 Big header */
-                    margin-bottom: 40px;
-                    letter-spacing: 1px;
+                    font-size: 26px;
+                    margin-bottom: 25px;
+                    letter-spacing: 0.5px;
                 }}
                 p {{
-                    margin: 12px 0;
-                    font-size: 30px;      /* 🔹 Larger paragraph text */
+                    margin: 8px 0;
+                    font-size: 17px;
                 }}
                 .thankyou {{
-                    margin-top: 40px;
-                    font-size: 36px;      /* 🔹 Large thank-you message */
+                    margin-top: 25px;
+                    font-size: 20px;
                     font-weight: bold;
                     text-align: center;
                     color: #2a7a2a;
                 }}
                 .footer {{
-                    margin-top: 40px;
-                    font-size: 22px;
+                    margin-top: 25px;
+                    font-size: 14px;
                     color: gray;
                     text-align: center;
                 }}
                 .download-btn {{
                     display: block;
                     text-align: center;
-                    margin-top: 35px;
+                    margin-top: 25px;
                 }}
                 .download-btn a {{
                     text-decoration: none;
                     background-color: #4CAF50;
                     color: white;
-                    padding: 20px 50px;
-                    font-size: 28px;       /* 🔹 Large button */
-                    border-radius: 10px;
+                    padding: 10px 25px;
+                    font-size: 16px;
+                    border-radius: 8px;
                     transition: 0.2s;
                 }}
                 .download-btn a:hover {{
@@ -174,8 +175,8 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
                         box-shadow: none;
                         border: none;
                         width: 100%;
-                        font-size: 28px;
-                        padding: 30px;
+                        font-size: 16px;
+                        padding: 20px;
                     }}
                     .download-btn {{ display: none; }}
                 }}
@@ -190,12 +191,12 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
                 <p><b>Time:</b> {compound.time}</p>
                 <p><b>Offense:</b> {compound.offense}</p>
                 <p><b>Amount:</b> 
-                    <span style="font-size:38px; font-weight:bold; color:#000;">
+                    <span style="font-size:20px; font-weight:bold; color:#000;">
                         RM {compound.amount:.2f}
                     </span>
                 </p>
     
-                <div class="thankyou">Thank you for your payment </div>
+                <div class="thankyou">Thank you for your payment</div>
     
                 <div class="download-btn">
                     <a href="{pdf_url}" target="_blank">
@@ -208,6 +209,7 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
         </body>
     </html>
     """
+    
     
     html_bytes = html.encode("utf-8")
     filename = f"compound_{compound.compoundnum}.html"
