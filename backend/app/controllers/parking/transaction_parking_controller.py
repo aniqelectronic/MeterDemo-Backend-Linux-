@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func, cast , Integer
-from fastapi.responses import HTMLResponse, FileResponse , StreamingResponse
+from fastapi.responses import HTMLResponse, FileResponse , StreamingResponse, JSONResponse
 from app.db.database import get_db
 from app.schema.parking.transaction_parking_schema import TransactionParking
 from app.models.parking.transaction_parking_model import TransactionResponse
@@ -180,7 +180,7 @@ def download_receipt_pdf(ticket_id: str, db: Session = Depends(get_db)):
     parking = db.query(Parking).filter(Parking.plate == transaction.plate).order_by(Parking.id.desc()).first()
     tx_type = transaction.transaction_type.value if transaction.transaction_type else "N/A"
 
-    # create PDF
+    # Create PDF in memory
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16)
@@ -199,13 +199,15 @@ def download_receipt_pdf(ticket_id: str, db: Session = Depends(get_db)):
     pdf.cell(0, 10, "Thank you!! Drive safely", ln=True, align="C")
 
     pdf_bytes = pdf.output(dest="S").encode("latin1")
-    buffer = io.BytesIO(pdf_bytes)
-    # Upload to Azure
-    #filename = f"receipt_{transaction.ticket_id}.pdf"
-    #receipt_url = upload_to_blob(filename, pdf_bytes, content_type="application/pdf")
 
-    return StreamingResponse(buffer, media_type="application/pdf", headers={
-        "Content-Disposition": f"inline; filename=compound_{transaction.ticket_id}.pdf"
+    # Upload to Azure Blob Storage
+    filename = f"receipt_{transaction.ticket_id}.pdf"
+    receipt_url = upload_to_blob(filename, pdf_bytes, content_type="application/pdf")
+
+    # Return SAS link (frontend can redirect to it)
+    return JSONResponse({
+        "message": "Receipt uploaded successfully",
+        "download_url": receipt_url
     })
 
 
@@ -296,18 +298,16 @@ def get_transaction_by_ticket(ticket_id: str, db: Session = Depends(get_db)):
 
 # ---------------- GET LATEST QR CODE ----------------
 @router.get("/latest/qr")
-def get_latest_qr(ticket_id: str,db: Session = Depends(get_db)):
+def get_latest_qr(db: Session = Depends(get_db)):
     """
     Get the latest transaction and return its QR code (PNG),
     pointing to the Azure Blob receipt URL (publicly accessible).
     """
-    transaction = db.query(TransactionParking).filter(TransactionParking.ticket_id == ticket_id).first()
-    if not transaction:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-        
-    tx = transaction
+    tx = db.query(TransactionParking).order_by(TransactionParking.id.desc()).first()
+    if not tx:
+        raise HTTPException(status_code=404, detail="No transactions found")
 
-    # ✅ Always regenerate blob receipt if not found or still using VM IP
+    # ✅ If receipt_url missing or not yet uploaded to blob, create it
     if not tx.receipt_url or "blob.core.windows.net" not in tx.receipt_url:
         parking = db.query(Parking).filter(Parking.plate == tx.plate).order_by(Parking.id.desc()).first()
         tx_type = tx.transaction_type.value if tx.transaction_type else "N/A"
@@ -395,14 +395,14 @@ def get_latest_qr(ticket_id: str,db: Session = Depends(get_db)):
             <body>
                 <div class="receipt">
                     <h2>Parking E-Receipt</h2>
-                    <p><b>Ticket ID:</b> {transaction.ticket_id}</p>
-                    <p><b>Plate:</b> {transaction.plate}</p>
-                    <p><b>Time Purchased (Hours):</b> {transaction.hours}</p>
+                    <p><b>Ticket ID:</b> {tx.ticket_id}</p>
+                    <p><b>Plate:</b> {tx.plate}</p>
+                    <p><b>Time Purchased (Hours):</b> {tx.hours}</p>
                     <p><b>Time In:</b> {parking.timein if parking else "N/A"}</p>
                     <p><b>Time Out:</b> {parking.timeout if parking else "N/A"}</p>
                     <p><b>Amount:</b> 
                         <span style="font-size:38px; font-weight:bold; color:#000;">
-                            RM {transaction.amount:.2f}
+                            RM {tx.amount:.2f}
                         </span>
                     </p>
                     <p><b>Transaction Type:</b> {tx_type}</p>
@@ -410,7 +410,7 @@ def get_latest_qr(ticket_id: str,db: Session = Depends(get_db)):
                     <div class="thankyou">Thank you! Drive safely </div>
         
                     <div class="download-btn">
-                        <a href="/transactions/receipt/pdf/{transaction.ticket_id}" target="_blank">
+                        <a href="/transactions/receipt/pdf/{tx.ticket_id}" target="_blank">
                             Download PDF
                         </a>
                     </div>
