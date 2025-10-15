@@ -108,6 +108,27 @@ def view_license_receipt(licensenum: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="License not found")
 
     license_obj = check_expiry(license_obj, db)
+    
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(0, 10, "License E-Receipt", ln=True, align="C")
+    pdf.ln(10)
+    pdf.set_font("Arial", '', 12)
+    pdf.cell(0, 8, f"License No: {license_obj.licensenum}", ln=True)
+    pdf.cell(0, 8, f"Type: {license_obj.licensetype}", ln=True)
+    pdf.cell(0, 8, f"Year: {license_obj.year}", ln=True)
+    pdf.cell(0, 8, f"Owner ID: {license_obj.owner_id}", ln=True)
+    pdf.cell(0, 8, f"Amount: RM {license_obj.amount:.2f}", ln=True)
+    pdf.cell(0, 8, f"Status: {license_obj.status}", ln=True)
+    pdf.cell(0, 8, f"Start Date: {license_obj.start_date}", ln=True)
+    pdf.cell(0, 8, f"End Date: {license_obj.end_date}", ln=True)
+    pdf.ln(10)
+    pdf.cell(0, 10, "Thank you for your payment!", ln=True, align="C")
+
+    pdf_bytes = pdf.output(dest="S").encode("latin1")
+    pdf_filename = f"license_{license_obj.licensenum}.pdf"
+    pdf_url = upload_to_blob(pdf_filename, pdf_bytes, content_type="application/pdf")
 
     html = f"""
     <html>
@@ -169,7 +190,7 @@ def view_license_receipt(licensenum: str, db: Session = Depends(get_db)):
                 <div class="thankyou">Thank you for your payment!</div>
 
                 <div class="download-btn">
-                    <a href="/license/receipt/pdf/{license_obj.licensenum}" target="_blank">
+                    <a href="{pdf_url}" target="_blank">
                         Download PDF
                     </a>
                 </div>
@@ -185,43 +206,7 @@ def view_license_receipt(licensenum: str, db: Session = Depends(get_db)):
     # ✅ Upload to Azure Blob
     blob_url = upload_to_blob(filename, html_bytes, content_type="text/html")
     
-    return {"message": "Uploaded successfully", "url": blob_url}
-
-
-# ================= LICENSE RECEIPT PDF =================
-@router.get("/receipt/pdf/{licensenum}")
-def download_license_receipt_pdf(licensenum: str, db: Session = Depends(get_db)):
-    license_obj = db.query(License).filter(License.licensenum == licensenum).first()
-    if not license_obj:
-        raise HTTPException(status_code=404, detail="License not found")
-
-    license_obj = check_expiry(license_obj, db)
-
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(0, 10, "License E-Receipt", ln=True, align="C")
-    pdf.ln(5)
-
-    pdf.set_font("Arial", '', 12)
-    pdf.cell(0, 8, f"License No: {license_obj.licensenum}", ln=True)
-    pdf.cell(0, 8, f"Type: {license_obj.licensetype}", ln=True)
-    pdf.cell(0, 8, f"Year: {license_obj.year}", ln=True)
-    pdf.cell(0, 8, f"Owner: {license_obj.owner_id}", ln=True)
-    pdf.cell(0, 8, f"Amount: RM {license_obj.amount:.2f}", ln=True)
-    pdf.cell(0, 8, f"Status: {license_obj.status}", ln=True)
-    pdf.cell(0, 8, f"Start Date: {license_obj.start_date}", ln=True)
-    pdf.cell(0, 8, f"End Date: {license_obj.end_date}", ln=True)
-    pdf.ln(10)
-    pdf.cell(0, 10, "Thank you for your payment!", ln=True, align="C")
-
-    pdf_bytes = pdf.output(dest="S").encode("latin1")
-    buffer = io.BytesIO(pdf_bytes)
-
-    return StreamingResponse(buffer, media_type="application/pdf", headers={
-        "Content-Disposition": f"inline; filename=license_{license_obj.licensenum}.pdf"
-    })
-
+    return {"url": blob_url}
 
 # ================= LICENSE RECEIPT QR =================
 @router.get("/receipt/qr/{licensenum}")
@@ -238,7 +223,6 @@ def generate_license_receipt_qr(licensenum: str, db: Session = Depends(get_db)):
     buffer.seek(0)
 
     return StreamingResponse(buffer, media_type="image/png")
-
 
 # ================= LICENSE QR DUMMY PAYMENT =================
 @router.get("/html/qrdummy/{licensenum}", response_class=HTMLResponse)

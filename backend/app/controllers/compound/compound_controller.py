@@ -81,6 +81,25 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
     if not compound:
         raise HTTPException(status_code=404, detail="Compound not found")
 
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(0, 10, "Compound E-Receipt", ln=True, align="C")
+    pdf.ln(5)
+    pdf.set_font("Arial", '', 12)
+    pdf.cell(0, 8, f"Compound No: {compound.compoundnum}", ln=True)
+    pdf.cell(0, 8, f"Plate: {compound.plate}", ln=True)
+    pdf.cell(0, 8, f"Date: {compound.date}", ln=True)
+    pdf.cell(0, 8, f"Time: {compound.time}", ln=True)
+    pdf.cell(0, 8, f"Offense: {compound.offense}", ln=True)
+    pdf.cell(0, 8, f"Amount: RM {compound.amount:.2f}", ln=True)
+    pdf.ln(10)
+    pdf.cell(0, 10, "Thank you for your payment!", ln=True, align="C")
+
+    pdf_bytes = pdf.output(dest="S").encode("latin1")
+    pdf_filename = f"compound_{compound.compoundnum}.pdf"
+    pdf_url = upload_to_blob(pdf_filename, pdf_bytes, content_type="application/pdf")
+    
     html = f"""
     <html>
         <head>
@@ -179,7 +198,7 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
                 <div class="thankyou">Thank you for your payment </div>
     
                 <div class="download-btn">
-                    <a href="/compound/receipt/pdf/{compound.compoundnum}" target="_blank">
+                    <a href="{pdf_url}" target="_blank">
                         Download PDF
                     </a>
                 </div>
@@ -198,42 +217,6 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
     
     return {"receipt_url": blob_url}
 
-
-# ================= RECEIPT PDF =================
-@router.get("/receipt/pdf/{compoundnum}")
-def download_compound_receipt_pdf(compoundnum: str, db: Session = Depends(get_db)):
-    compound = db.query(Compound).filter(Compound.compoundnum == compoundnum).first()
-    if not compound:
-        raise HTTPException(status_code=404, detail="Compound not found")
-
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(0, 10, "Compound E-Receipt", ln=True, align="C")
-    pdf.ln(5)
-
-    pdf.set_font("Arial", '', 12)
-    pdf.cell(0, 8, f"Compound No: {compound.compoundnum}", ln=True)
-    pdf.cell(0, 8, f"Plate: {compound.plate}", ln=True)
-    pdf.cell(0, 8, f"Date: {compound.date}", ln=True)
-    pdf.cell(0, 8, f"Time: {compound.time}", ln=True)
-    pdf.cell(0, 8, f"Offense: {compound.offense}", ln=True)
-    pdf.cell(0, 8, f"Amount: RM {compound.amount:.2f}", ln=True)
-    pdf.ln(10)
-    pdf.cell(0, 10, "Thank you for your payment!", ln=True, align="C")
-
-    # write PDF into memory
-    pdf_bytes = pdf.output(dest="S").encode("latin1")
-    buffer = io.BytesIO(pdf_bytes)
-    
-        # Upload to Azure
-    #filename = f"receipt_{Compound.compoundnum}.pdf"
-    #receipt_url = upload_to_blob(filename, pdf_bytes, content_type="application/pdf")
-
-    return StreamingResponse(buffer, media_type="application/pdf", headers={
-        "Content-Disposition": f"inline; filename=compound_{compound.compoundnum}.pdf"
-    })
-    
     
 # ================= COMPOUND RECEIPT QR =================
 @router.get("/receipt/qr/{compoundnum}")
