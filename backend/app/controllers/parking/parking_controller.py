@@ -177,7 +177,7 @@ def qr_page(plate: str, hours: int):
         <h1>Parking Payment</h1>
         <p>Plate: {plate}</p>
         <button style='font-size:30px;padding:20px;'
-            onclick="fetch('/parking/pay', {{
+            onclick="fetch('http://4.194.122.32:8000/parking/pay', {{
                 method:'POST',
                 headers: {{ 'Content-Type': 'application/json' }},
                 body: JSON.stringify({{ plate: '{plate}', time_used: {hours}}})
