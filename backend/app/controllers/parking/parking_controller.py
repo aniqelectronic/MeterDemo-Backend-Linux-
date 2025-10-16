@@ -169,17 +169,17 @@ def get_all(db: Session = Depends(get_db)):
     return get_all_parkings(db)
 
 
-@router.get("/qrdummy/{plate}/{hours}", response_class=HTMLResponse)
+@router.get("/html/qrdummy/{plate}/{hours}", response_class=HTMLResponse)
 def qr_page(plate: str, hours: int):
     # HTML page that will be uploaded to blob
-    html = f"""
+    return f"""
     <html>
     <body style='text-align:center;margin-top:200px;'>
         <h1>Parking Payment</h1>
         <p>Plate: {plate}</p>
         <button style='font-size:30px;padding:20px;'
             onclick="
-                fetch('{BASE_URL}/parking/pay', {{
+                fetch('/parking/pay', {{
                     method:'POST',
                     headers: {{ 'Content-Type': 'application/json' }},
                     body: JSON.stringify({{ plate: '{plate}', time_used: {hours} }})
@@ -202,26 +202,29 @@ def qr_page(plate: str, hours: int):
     </html>
     """
 
-    # Upload HTML to blob storage
-    html_bytes = html.encode("utf-8")
-    filename = f"qrdummy_{plate}.html"
-    html_url = upload_to_blob(filename, html_bytes, content_type="text/html")
 
-    # Generate QR code for blob URL
+# ---------------- Create dummy qr code payment image ----------------
+
+@router.get("/qrdummy/{plate}/{hours}")
+def generate_receipt_qr(plate: str, hours: int):
+
+    # Use stored URL or generate if missing
+    receipt_url =  f"{BASE_URL}/parking/html/qrdummy/{plate}/{hours}"
+
+    # Generate QR code
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_L,
         box_size=10,
         border=4,
     )
-    qr.add_data(html_url)
+    qr.add_data(receipt_url)
     qr.make(fit=True)
 
+    # Convert to image in memory
     img = qr.make_image(fill_color="black", back_color="white")
     buf = BytesIO()
     img.save(buf, format="PNG")
     buf.seek(0)
 
     return StreamingResponse(buf, media_type="image/png")
-
-

@@ -252,9 +252,7 @@ def qr_page(compoundnum: str):
 
 @router.get("/qrdummy/{compoundnum}")
 def generate_receipt_qr(compoundnum: str, db: Session = Depends(get_db)):
-    """
-    Generate a QR code for the receipt URL stored in DB.
-    """
+
     # Use stored URL or generate if missing
     receipt_url =  f"{BASE_URL}/compound/html/qrdummy/{compoundnum}"
 
