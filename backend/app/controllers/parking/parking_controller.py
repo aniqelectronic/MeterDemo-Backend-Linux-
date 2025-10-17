@@ -13,20 +13,17 @@ from app.models.parking.parking_model import (
     ParkingResponse
 )
 
+
 import qrcode
 from io import BytesIO
 
 from app.utils.blob_upload import upload_to_blob
 
 # ----------------- CONFIG -----------------
-from app.utils.config import BASE_URL
+from app.utils.config import BASE_URL, RATE_PER_HOUR
 
 router = APIRouter(prefix="/parking", tags=["Parking"])
 
-# -------------------------
-# Pricing Logic
-# -------------------------
-RATE_PER_HOUR = 0.60   # ✅ 1 hour = RM0.60
 
 def calculate_amount(hours: float) -> float:  
     """Convert parking hours into RM amount."""
