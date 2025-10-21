@@ -183,7 +183,7 @@ def qr_page(plate: str, hours: int, terminal: str):
                 fetch('/parking/pay/', {{
                     method:'POST',
                     headers: {{ 'Content-Type': 'application/json' }},
-                    body: JSON.stringify({{ plate: '{plate}', time_used: {hours}, terminal: {terminal} }})
+                    body: JSON.stringify({{ plate: '{plate}', time_used: {hours}, terminal: '{terminal}' }})
                 }})
                 .then(response => {{
                     if(response.ok) {{
