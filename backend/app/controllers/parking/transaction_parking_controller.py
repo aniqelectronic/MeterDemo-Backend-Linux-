@@ -163,7 +163,7 @@ def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
                 <div class="thankyou">Thank you! Drive safely </div>
     
                 <div class="download-btn">
-                    <a href="{pdf_url}" target="_blank">Download PDF
+                    <a href="{pdf_url}" target="_blank">
                         Download PDF
                     </a>
                 </div>
