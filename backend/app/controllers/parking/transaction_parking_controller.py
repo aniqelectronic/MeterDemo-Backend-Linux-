@@ -31,11 +31,6 @@ def get_all_transactions(db: Session = Depends(get_db)):
     transactions = db.query(TransactionParking).all()
     if not transactions:
         return []
-
-    for tx in transactions:
-        # dynamically add receipt_url to the object (even if already in DB)
-        tx.receipt_url = f"{BASE_URL}/transactions/receipt/view/{tx.ticket_id}"
-        db.commit()
     return transactions
 
 
@@ -203,73 +198,6 @@ from fastapi.responses import StreamingResponse
 import io
 from fpdf import FPDF
 
-# ---------------- QR CODE SPECIFIC PLATE NUMBER----------------
-""""
-This will give you the Qr code for the receipt of the ticket id that you given 
-example in postman :
-
-Get http://192.168.22.15:8000/transactions/receipt/qr/P-0006
-
-so it will give the specific P-0006 ticket qr code
-
-"""
-
-@router.get("/receipt/qr/{ticket_id}")
-def generate_receipt_qr(ticket_id: str, db: Session = Depends(get_db)):
-    """
-    Generate a QR code for the receipt URL stored in DB.
-    """
-    transaction = db.query(TransactionParking).filter(TransactionParking.ticket_id == ticket_id).first()
-    if not transaction:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-    
-    # Use stored URL or generate if missing
-    receipt_url =  f"{BASE_URL}/transactions/receipt/view/{transaction.ticket_id}"
-
-    # Save URL to DB if missing or outdated
-    if transaction.receipt_url != receipt_url:
-        transaction.receipt_url = receipt_url
-        db.commit()
-    
-    # Generate QR code
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
-    )
-    qr.add_data(receipt_url)
-    qr.make(fit=True)
-
-    # Convert to image in memory
-    img = qr.make_image(fill_color="black", back_color="white")
-    buf = BytesIO()
-    img.save(buf, format="PNG")
-    buf.seek(0)
-
-    return StreamingResponse(buf, media_type="image/png")
-
-# ---------------- GET LATEST TRANSACTION ----------------
-"""
-This is for getting latest ticket url
-"""
-@router.get("/latest")
-def get_latest_transaction(db: Session = Depends(get_db)):
-    """
-    Get the latest transaction based on auto-increment `id`
-    and return its receipt URL.
-    """
-    tx = db.query(TransactionParking).order_by(TransactionParking.id.desc()).first()
-    print(tx)
-
-    if not tx:
-        raise HTTPException(status_code=404, detail="No transactions found")
-
-    # Always refresh receipt URL
-    tx.receipt_url =  f"{BASE_URL}/transactions/receipt/view/{tx.ticket_id}"
-
-    return {"receipt_url": tx.receipt_url}
-
 # ---------------- GET BY TICKET ----------------
 """
 Get the all ticket info 
@@ -283,9 +211,6 @@ def get_transaction_by_ticket(ticket_id: str, db: Session = Depends(get_db)):
     if not tx:
         raise HTTPException(status_code=404, detail="Transaction not found")
 
-
-    tx.receipt_url = f"{BASE_URL}/transactions/receipt/view/{tx.ticket_id}"
-    db.commit()  # update database
     return tx
 
 # ---------------- GET LATEST QR CODE ----------------
