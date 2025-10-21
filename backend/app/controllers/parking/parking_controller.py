@@ -51,7 +51,7 @@ def check_active_parking(db: Session, plate: str):
     return None
 
 
-def add_new_parking(db: Session, plate: str, time_used: float, terminal: int):
+def add_new_parking(db: Session, plate: str, time_used: float, terminal: str):
     now = malaysia_now()
     timeout = now + timedelta(hours=time_used)
     amount=calculate_amount(time_used) 
@@ -86,7 +86,7 @@ def add_new_parking(db: Session, plate: str, time_used: float, terminal: int):
     return new_parking
 
 # ✅ changed parking_id -> plate
-def extend_parking(db: Session, plate: str, hours: float, terminal: int):
+def extend_parking(db: Session, plate: str, hours: float, terminal: str):
     active = check_active_parking(db, plate)
     if not active:
         raise HTTPException(status_code=404, detail="No active paid parking to extend")
@@ -156,7 +156,7 @@ def pay_parking(parking: ParkingCreate, db: Session = Depends(get_db)):
 
 # ✅ changed path param name from parking_id -> plate
 @router.put("/{plate}/{terminal}/extend", response_model=ParkingResponse)
-def extend(plate: str, terminal: int, extend: ParkingExtend, db: Session = Depends(get_db)):
+def extend(plate: str, terminal: str, extend: ParkingExtend, db: Session = Depends(get_db)):
     """
     Extend an active paid parking.
     """
@@ -171,7 +171,7 @@ def get_all(db: Session = Depends(get_db)):
 
 
 @router.get("/html/qrdummy/{plate}/{hours}/{terminal}", response_class=HTMLResponse)
-def qr_page(plate: str, hours: int, terminal: int):
+def qr_page(plate: str, hours: int, terminal: str):
     # HTML page that will be uploaded to blob
     return f"""
     <html>
@@ -207,7 +207,7 @@ def qr_page(plate: str, hours: int, terminal: int):
 # ---------------- Create dummy qr code payment image ----------------
 
 @router.get("/qrdummy/{plate}/{hours}/{terminal}")
-def generate_receipt_qr(plate: str, hours: int, terminal: int):
+def generate_receipt_qr(plate: str, hours: int, terminal: str):
 
     # Use stored URL or generate if missing
     receipt_url =  f"{BASE_URL}/parking/html/qrdummy/{plate}/{hours}/{terminal}"
