@@ -1,0 +1,12 @@
+This is the code that run in VM 
+
+Dont forget to change the variable/config in config.py
+
+BASE_IP is the ip address of VM IP address (cause we run backend in VM)
+BASE_URL is the url to use for receipt mostly (make sure the Public IP of router machine gain access to that VM IP and port)
+
+RATE_PER_HOUR is rate of parking payment per hour (make sure change it if diff)
+
+
+port 3306 = Mysql port (Give Public IP address internet in office to gain access to Mysql DB cause DB run in VM)
+port 8000 = backend port (Give a Public IP address of machine router for this port to gain access to backend which is run in VM)

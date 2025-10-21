@@ -10,7 +10,8 @@ class ParkingCheck(BaseModel):
 
 class ParkingCreate(BaseModel):
     plate: str
-    time_used: float  
+    time_used: float
+    terminal: int
 
 class ParkingExtend(BaseModel):
     extend_hours: float
@@ -24,6 +25,7 @@ class PaymentStatusEnum(str, Enum):
 
 class ParkingResponse(BaseModel):
     id: int
+    terminal: int 
     plate: str
     time_used: float
     payment_status: PaymentStatusEnum

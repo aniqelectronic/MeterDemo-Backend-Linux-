@@ -51,13 +51,14 @@ def check_active_parking(db: Session, plate: str):
     return None
 
 
-def add_new_parking(db: Session, plate: str, time_used: float):
+def add_new_parking(db: Session, plate: str, time_used: float, terminal: int):
     now = malaysia_now()
     timeout = now + timedelta(hours=time_used)
-    amount=calculate_amount(time_used),   
+    amount=calculate_amount(time_used) 
     
     new_parking = Parking(
         plate=plate, 
+        terminal= terminal,
         time_used=time_used,
         timein=now,
         timeout=timeout,
@@ -74,6 +75,7 @@ def add_new_parking(db: Session, plate: str, time_used: float):
     transaction = TransactionParking(
         ticket_id=next_ticket,
         plate=plate,
+        terminal= terminal,
         hours=time_used,
         amount=amount,
         transaction_type=TransactionTypeEnum.new
@@ -84,7 +86,7 @@ def add_new_parking(db: Session, plate: str, time_used: float):
     return new_parking
 
 # ✅ changed parking_id -> plate
-def extend_parking(db: Session, plate: str, hours: float):
+def extend_parking(db: Session, plate: str, hours: float, terminal: int):
     active = check_active_parking(db, plate)
     if not active:
         raise HTTPException(status_code=404, detail="No active paid parking to extend")
@@ -93,6 +95,7 @@ def extend_parking(db: Session, plate: str, hours: float):
     active.time_used += hours
     active.timeout += timedelta(hours=hours)
     active.amount = calculate_amount(active.time_used)
+    active.terminal = terminal 
     db.commit()
     db.refresh(active)
 
@@ -101,6 +104,7 @@ def extend_parking(db: Session, plate: str, hours: float):
     next_ticket = f"P-{(last_tx.id + 1) if last_tx else 1:04d}"
     transaction = TransactionParking(
         ticket_id=next_ticket,
+        terminal=terminal,
         plate=plate,
         hours=hours,
         amount=calculate_amount(hours),
@@ -148,15 +152,15 @@ def pay_parking(parking: ParkingCreate, db: Session = Depends(get_db)):
     active = check_active_parking(db, parking.plate)  
     if active:
         raise HTTPException(status_code=400, detail=f"Parking already active until {active.timeout}")
-    return add_new_parking(db, parking.plate, parking.time_used)  
+    return add_new_parking(db, parking.plate, parking.time_used, parking.terminal)  
 
 # ✅ changed path param name from parking_id -> plate
-@router.put("/{plate}/extend", response_model=ParkingResponse)
-def extend(plate: str, extend: ParkingExtend, db: Session = Depends(get_db)):
+@router.put("/{plate}/{terminal}/extend", response_model=ParkingResponse)
+def extend(plate: str, terminal: int, extend: ParkingExtend, db: Session = Depends(get_db)):
     """
     Extend an active paid parking.
     """
-    return extend_parking(db, plate, extend.extend_hours)  
+    return extend_parking(db, plate, extend.extend_hours, terminal)  
 
 @router.get("/", response_model=list[ParkingResponse])
 def get_all(db: Session = Depends(get_db)):
@@ -166,8 +170,8 @@ def get_all(db: Session = Depends(get_db)):
     return get_all_parkings(db)
 
 
-@router.get("/html/qrdummy/{plate}/{hours}", response_class=HTMLResponse)
-def qr_page(plate: str, hours: int):
+@router.get("/html/qrdummy/{plate}/{hours}/{terminal}", response_class=HTMLResponse)
+def qr_page(plate: str, hours: int, terminal: int):
     # HTML page that will be uploaded to blob
     return f"""
     <html>
@@ -176,10 +180,10 @@ def qr_page(plate: str, hours: int):
         <p>Plate: {plate}</p>
         <button style='font-size:30px;padding:20px;'
             onclick="
-                fetch('/parking/pay', {{
+                fetch('/parking/pay/', {{
                     method:'POST',
                     headers: {{ 'Content-Type': 'application/json' }},
-                    body: JSON.stringify({{ plate: '{plate}', time_used: {hours} }})
+                    body: JSON.stringify({{ plate: '{plate}', time_used: {hours}, terminal: {terminal} }})
                 }})
                 .then(response => {{
                     if(response.ok) {{
@@ -202,11 +206,11 @@ def qr_page(plate: str, hours: int):
 
 # ---------------- Create dummy qr code payment image ----------------
 
-@router.get("/qrdummy/{plate}/{hours}")
-def generate_receipt_qr(plate: str, hours: int):
+@router.get("/qrdummy/{plate}/{hours}/{terminal}")
+def generate_receipt_qr(plate: str, hours: int, terminal: int):
 
     # Use stored URL or generate if missing
-    receipt_url =  f"{BASE_URL}/parking/html/qrdummy/{plate}/{hours}"
+    receipt_url =  f"{BASE_URL}/parking/html/qrdummy/{plate}/{hours}/{terminal}"
 
     # Generate QR code
     qr = qrcode.QRCode(

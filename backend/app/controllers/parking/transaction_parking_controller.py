@@ -48,6 +48,27 @@ def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
         
     parking = db.query(Parking).filter(Parking.plate == transaction.plate).order_by(Parking.id.desc()).first()
     tx_type = transaction.transaction_type.value if transaction.transaction_type else "N/A"
+    
+        # ✅ Generate PDF receipt
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0, 10, "Parking E-Receipt", ln=True, align="C")
+    pdf.ln(10)
+    pdf.set_font("Arial", "", 12)
+    pdf.cell(0, 8, f"Ticket ID: {transaction.ticket_id}", ln=True)
+    pdf.cell(0, 8, f"Plate: {transaction.plate}", ln=True)
+    pdf.cell(0, 8, f"Time Purchased (Hours): {transaction.hours}", ln=True)
+    pdf.cell(0, 8, f"Time In: {parking.timein if parking else 'N/A'}", ln=True)
+    pdf.cell(0, 8, f"Time Out: {parking.timeout if parking else 'N/A'}", ln=True)
+    pdf.cell(0, 8, f"Amount: RM {transaction.amount:.2f}", ln=True)
+    pdf.cell(0, 8, f"Transaction Type: {tx_type}", ln=True)
+    pdf.ln(10)
+    pdf.cell(0, 10, "Thank you! Drive safely", ln=True, align="C")
+
+    pdf_bytes = pdf.output(dest="S").encode("latin1")
+    pdf_filename = f"receipt_{transaction.ticket_id}.pdf"
+    pdf_url = upload_to_blob(pdf_filename, pdf_bytes, content_type="application/pdf")
 
     html = f"""
     <html>
@@ -147,7 +168,7 @@ def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
                 <div class="thankyou">Thank you! Drive safely </div>
     
                 <div class="download-btn">
-                    <a href="/transactions/receipt/pdf/{transaction.ticket_id}" target="_blank">
+                    <a href="{pdf_url}" target="_blank">Download PDF</a>
                         Download PDF
                     </a>
                 </div>
@@ -164,7 +185,18 @@ def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
     transaction.receipt_url = html_url
     db.commit()
 
-    return {"receipt_url": html_url}
+    # Generate QR for Blob URL
+    receipt_url = transaction.receipt_url
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
+    qr.add_data(receipt_url)
+    qr.make(fit=True)
+
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+
+    return StreamingResponse(buf, media_type="image/png")
 
 # ---------------- RECEIPT PDF ----------------
 from fastapi.responses import StreamingResponse
@@ -235,7 +267,6 @@ def get_latest_transaction(db: Session = Depends(get_db)):
 
     # Always refresh receipt URL
     tx.receipt_url =  f"{BASE_URL}/transactions/receipt/view/{tx.ticket_id}"
-    db.commit()
 
     return {"receipt_url": tx.receipt_url}
 
@@ -457,6 +488,7 @@ def get_latest_receipt_by_plate(plate: str, db: Session = Depends(get_db)):
     # 🔹 Step 3: Return combined info
     return {
         "ticket_id": transaction.ticket_id,
+        "terminal": transaction.terminal,
         "plate": transaction.plate,
         "hours": transaction.hours,
         "amount": transaction.amount,

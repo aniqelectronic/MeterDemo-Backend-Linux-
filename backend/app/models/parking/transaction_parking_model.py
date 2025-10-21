@@ -9,6 +9,7 @@ class TransactionTypeEnum(str, Enum):
 
 class TransactionResponse(BaseModel):
     id: int
+    terminal: int 
     ticket_id: str
     plate: str
     hours: float
@@ -23,6 +24,7 @@ class TransactionResponse(BaseModel):
         
 class TransactionCreate(BaseModel):
     ticket_id: str
+    terminal: int 
     plate: str
     hours: float
     amount: float

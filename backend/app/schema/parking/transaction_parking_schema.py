@@ -14,6 +14,7 @@ class TransactionParking(Base):
     __tablename__ = "transaction_parkings"   
 
     id = Column(Integer, primary_key=True, index=True)
+    terminal = Column(Integer, nullable=False)
     ticket_id = Column(String(20), unique=True, index=True)  # e.g., P-0001
     plate = Column(String(50), index=True)
     hours = Column(Float, nullable=False)  # total hours paid

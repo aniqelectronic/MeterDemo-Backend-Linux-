@@ -22,6 +22,7 @@ class Parking(Base):
     __tablename__ = "parkings"
 
     id = Column(Integer, primary_key=True, index=True)
+    terminal = Column(Integer, nullable=False)
     plate = Column(String(50), index=True)
     time_used = Column(Float)
     payment_status = Column(Enum(PaymentStatusEnum), default=PaymentStatusEnum.no)
