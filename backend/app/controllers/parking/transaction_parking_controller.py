@@ -7,6 +7,8 @@ from app.db.database import get_db
 from app.schema.parking.transaction_parking_schema import TransactionParking
 from app.models.parking.transaction_parking_model import TransactionResponse
 from app.utils.blob_upload import upload_to_blob
+from app.controllers.parking.parking_receipt import generate_parking_receipt
+
 
 
 
@@ -45,23 +47,17 @@ def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
     tx_type = transaction.transaction_type.value if transaction.transaction_type else "N/A"
     
         # ✅ Generate PDF receipt
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, "Parking E-Receipt", ln=True, align="C")
-    pdf.ln(10)
-    pdf.set_font("Arial", "", 12)
-    pdf.cell(0, 8, f"Ticket ID: {transaction.ticket_id}", ln=True)
-    pdf.cell(0, 8, f"Plate: {transaction.plate}", ln=True)
-    pdf.cell(0, 8, f"Time Purchased (Hours): {transaction.hours}", ln=True)
-    pdf.cell(0, 8, f"Time In: {parking.timein if parking else 'N/A'}", ln=True)
-    pdf.cell(0, 8, f"Time Out: {parking.timeout if parking else 'N/A'}", ln=True)
-    pdf.cell(0, 8, f"Amount: RM {transaction.amount:.2f}", ln=True)
-    pdf.cell(0, 8, f"Transaction Type: {tx_type}", ln=True)
-    pdf.ln(10)
-    pdf.cell(0, 10, "Thank you! Drive safely", ln=True, align="C")
+    logo_path = os.path.join("resources", "images", "PBT_Kuantan_logo.png")
+    pdf_bytes = generate_parking_receipt(
+        ticket_id=transaction.ticket_id,
+        plate=transaction.plate,
+        hours=transaction.hours,
+        time_in=parking.timein if parking else "N/A",
+        time_out=parking.timeout if parking else "N/A",
+        amount=transaction.amount,
+        logo_path=logo_path
+    )
 
-    pdf_bytes = pdf.output(dest="S").encode("latin1")
     pdf_filename = f"receipt_{transaction.ticket_id}.pdf"
     pdf_url = upload_to_blob(pdf_filename, pdf_bytes, content_type="application/pdf")
 
@@ -230,23 +226,16 @@ def get_latest_qr(db: Session = Depends(get_db)):
         tx_type = tx.transaction_type.value if tx.transaction_type else "N/A"
 
         # ✅ Generate PDF first
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", 'B', 16)
-        pdf.cell(0, 10, "Parking E-Receipt", ln=True, align="C")
-        pdf.ln(10)
-        pdf.set_font("Arial", '', 12)
-        pdf.cell(0, 8, f"Ticket ID: {tx.ticket_id}", ln=True)
-        pdf.cell(0, 8, f"Plate: {tx.plate}", ln=True)
-        pdf.cell(0, 8, f"Time Purchased (Hours): {tx.hours}", ln=True)
-        pdf.cell(0, 8, f"Time In: {parking.timein if parking else 'N/A'}", ln=True)
-        pdf.cell(0, 8, f"Time Out: {parking.timeout if parking else 'N/A'}", ln=True)
-        pdf.cell(0, 8, f"Amount: RM {tx.amount:.2f}", ln=True)
-        pdf.cell(0, 8, f"Transaction Type: {tx_type}", ln=True)
-        pdf.ln(10)
-        pdf.cell(0, 10, "Thank you!! Drive safely", ln=True, align="C")
+        pdf_bytes = generate_parking_receipt(
+            ticket_id=tx.ticket_id,
+            plate=tx.plate,
+            hours=tx.hours,
+            time_in=parking.timein if parking else "N/A",
+            time_out=parking.timeout if parking else "N/A",
+            amount=tx.amount,
+        )
 
-        pdf_bytes = pdf.output(dest="S").encode("latin1")
+        # ✅ Upload the PDF to Azure Blob
         pdf_filename = f"receipt_{tx.ticket_id}.pdf"
         pdf_url = upload_to_blob(pdf_filename, pdf_bytes, content_type="application/pdf")
         
