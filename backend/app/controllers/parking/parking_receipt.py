@@ -30,7 +30,7 @@ class ReceiptPDF(FPDF):
         self.set_y(-22)
         self.set_font("Arial", 'I', 11)
         self.set_text_color(90, 90, 90)
-        self.cell(0, 10, "Thank you for choosing ParkSmart - Drive Safely!", 0, 0, 'C')
+        self.cell(0, 10, "Thank you & Drive Safely!", 0, 0, 'C')
 
 
 def generate_parking_receipt(ticket_id, plate, hours, time_in, time_out, amount, logo_path):
@@ -81,10 +81,6 @@ def generate_parking_receipt(ticket_id, plate, hours, time_in, time_out, amount,
     barcode_x = (210 - barcode_width) / 2
     pdf.image(barcode_img_path, x=barcode_x, w=barcode_width)
     pdf.ln(8)
-
-    pdf.set_font("Arial", 'B', 11)
-    pdf.set_text_color(70, 70, 70)
-    pdf.cell(0, 8, ticket_id, ln=True, align="C")
 
     pdf_bytes = pdf.output(dest="S").encode("latin1")
     os.remove(barcode_img_path)

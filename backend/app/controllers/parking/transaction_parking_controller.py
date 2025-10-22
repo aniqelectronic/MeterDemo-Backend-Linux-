@@ -47,7 +47,10 @@ def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
     tx_type = transaction.transaction_type.value if transaction.transaction_type else "N/A"
     
         # ✅ Generate PDF receipt
-    logo_path = os.path.join("resources", "images", "PBT_Kuantan_logo.png")
+        # ✅ Generate PDF first
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    logo_path = os.path.abspath(os.path.join(base_dir, "../../resources/images/PBT_Kuantan_logo.png"))
+    
     pdf_bytes = generate_parking_receipt(
         ticket_id=transaction.ticket_id,
         plate=transaction.plate,
@@ -226,7 +229,8 @@ def get_latest_qr(db: Session = Depends(get_db)):
         tx_type = tx.transaction_type.value if tx.transaction_type else "N/A"
 
         # ✅ Generate PDF first
-        logo_path = os.path.join("resources", "images", "PBT_Kuantan_logo.png")
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        logo_path = os.path.abspath(os.path.join(base_dir, "../../resources/images/PBT_Kuantan_logo.png"))
         
         pdf_bytes = generate_parking_receipt(
             ticket_id=tx.ticket_id,
