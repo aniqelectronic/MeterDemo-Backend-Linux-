@@ -45,7 +45,7 @@ def generate_parking_receipt(ticket_id, plate, hours, time_in, time_out, amount,
 
     # --- Barcode generation
     code128 = barcode.get('code128', ticket_id, writer=ImageWriter())
-    barcode_options = {"module_height": 7.0, "font_size": 0}
+    barcode_options = {"module_height": 7.0, "font_size": 8}
     code128.save(barcode_img_path.replace(".png", ""), options=barcode_options)
     barcode_img_path = barcode_img_path.replace(".png", ".png")
 
