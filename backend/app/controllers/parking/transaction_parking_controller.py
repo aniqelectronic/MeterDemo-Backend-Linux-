@@ -226,6 +226,8 @@ def get_latest_qr(db: Session = Depends(get_db)):
         tx_type = tx.transaction_type.value if tx.transaction_type else "N/A"
 
         # ✅ Generate PDF first
+        logo_path = os.path.join("resources", "images", "PBT_Kuantan_logo.png")
+        
         pdf_bytes = generate_parking_receipt(
             ticket_id=tx.ticket_id,
             plate=tx.plate,
@@ -233,6 +235,7 @@ def get_latest_qr(db: Session = Depends(get_db)):
             time_in=parking.timein if parking else "N/A",
             time_out=parking.timeout if parking else "N/A",
             amount=tx.amount,
+            logo_path=logo_path
         )
 
         # ✅ Upload the PDF to Azure Blob
