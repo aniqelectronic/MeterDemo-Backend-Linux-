@@ -1,7 +1,27 @@
 # app/utils/receipt.py
+
 from fpdf import FPDF
+import tempfile
 import os
-from io import BytesIO
+
+# Global cached logo file path (to avoid re-writing it every time)
+LOGO_PATH = None
+
+
+def setup_logo_cache(logo_bytes: bytes) -> str:
+    """
+    Save the logo bytes to a temporary file once and reuse the same file path
+    for all future PDF generations.
+    """
+    global LOGO_PATH
+    if LOGO_PATH is None:
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        tmp.write(logo_bytes)
+        tmp.flush()
+        tmp.close()
+        LOGO_PATH = tmp.name
+    return LOGO_PATH
+
 
 class ReceiptPDF(FPDF):
     def __init__(self, logo_bytes=None):
@@ -11,10 +31,11 @@ class ReceiptPDF(FPDF):
     def header(self):
         if self.logo_bytes:
             logo_width = 28
-            # ✅ Use image from memory (no temp file)
-            self.image(BytesIO(self.logo_bytes), x=(210 - logo_width) / 2, y=10, w=logo_width)
-        self.ln(50)
+            # ✅ Use cached logo path instead of BytesIO (faster and fixes error)
+            logo_path = setup_logo_cache(self.logo_bytes)
+            self.image(logo_path, x=(210 - logo_width) / 2, y=10, w=logo_width)
 
+        self.ln(50)
         self.set_font("Arial", 'B', 20)
         self.set_text_color(30, 30, 30)
         self.cell(0, 10, "PARKING E-RECEIPT", ln=True, align="C")
@@ -32,6 +53,9 @@ class ReceiptPDF(FPDF):
 
 
 def generate_parking_receipt(ticket_id, plate, hours, time_in, time_out, amount, transaction_type, logo_bytes):
+    """
+    Generate a parking e-receipt PDF and return it as bytes.
+    """
     pdf = ReceiptPDF(logo_bytes=logo_bytes)
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=25)
