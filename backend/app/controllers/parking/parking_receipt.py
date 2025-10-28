@@ -33,7 +33,7 @@ class ReceiptPDF(FPDF):
         self.cell(0, 10, "Thank you & Drive Safely!", 0, 0, 'C')
 
 
-def generate_parking_receipt(ticket_id, plate, hours, time_in, time_out, amount, logo_path):
+def generate_parking_receipt(ticket_id, plate, hours, time_in, time_out, amount, transaction_type, logo_path):
     """
     Generates a professional parking receipt PDF.
     Returns PDF bytes ready to upload or stream.
@@ -62,6 +62,7 @@ def generate_parking_receipt(ticket_id, plate, hours, time_in, time_out, amount,
         "Time Purchased (Hours)": hours,
         "Time In": time_in,
         "Time Out": time_out,
+        "Transaction Type": transaction_type,
         "Amount": f"RM {amount:.2f}",
     }
 

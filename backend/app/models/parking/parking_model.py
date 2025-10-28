@@ -12,9 +12,11 @@ class ParkingCreate(BaseModel):
     plate: str
     time_used: float
     terminal: str
+    transaction_type : str
 
 class ParkingExtend(BaseModel):
     extend_hours: float
+    transaction_type : str
 
 # -------------------------
 # Response Schema

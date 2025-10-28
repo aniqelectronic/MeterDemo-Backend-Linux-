@@ -44,7 +44,6 @@ def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Ticket not found")
         
     parking = db.query(Parking).filter(Parking.plate == transaction.plate).order_by(Parking.id.desc()).first()
-    tx_type = transaction.transaction_type.value if transaction.transaction_type else "N/A"
     
         # ✅ Generate PDF receipt
         # ✅ Generate PDF first
@@ -58,6 +57,7 @@ def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
         time_in=parking.timein if parking else "N/A",
         time_out=parking.timeout if parking else "N/A",
         amount=transaction.amount,
+        transaction_type= transaction.Transaction_type if transaction else "N/A",
         logo_path=logo_path
     )
 
@@ -157,7 +157,7 @@ def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
                         RM {transaction.amount:.2f}
                     </span>
                 </p>
-                <p><b>Transaction Type:</b> {tx_type}</p>
+                <p><b>Transaction Type:</b> {transaction.Transaction_type if transaction else "N/A"}</p>
     
                 <div class="thankyou">Thank you! Drive safely </div>
     
@@ -226,7 +226,6 @@ def get_latest_qr(db: Session = Depends(get_db)):
     # ✅ If receipt_url missing or not yet uploaded to blob, create it
     if not tx.receipt_url or "blob.core.windows.net" not in tx.receipt_url:
         parking = db.query(Parking).filter(Parking.plate == tx.plate).order_by(Parking.id.desc()).first()
-        tx_type = tx.transaction_type.value if tx.transaction_type else "N/A"
 
         # ✅ Generate PDF first
         base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -239,6 +238,7 @@ def get_latest_qr(db: Session = Depends(get_db)):
             time_in=parking.timein if parking else "N/A",
             time_out=parking.timeout if parking else "N/A",
             amount=tx.amount,
+            transaction_type= tx.Transaction_type if tx else "N/A",
             logo_path=logo_path
         )
 
@@ -339,7 +339,7 @@ def get_latest_qr(db: Session = Depends(get_db)):
                             RM {tx.amount:.2f}
                         </span>
                     </p>
-                    <p><b>Transaction Type:</b> {tx_type}</p>
+                    <p><b>Transaction Type:</b> {tx.Transaction_type if tx else "N/A"}</p>
         
                     <div class="thankyou">Thank you! Drive safely </div>
         
@@ -378,8 +378,6 @@ def get_latest_qr(db: Session = Depends(get_db)):
     return StreamingResponse(buf, media_type="image/png")
 
 
-
-
 # ---------------- LATEST RECEIPT BY PLATE ----------------
 @router.get("/latest/{plate}")
 def get_latest_receipt_by_plate(plate: str, db: Session = Depends(get_db)):
@@ -413,7 +411,7 @@ def get_latest_receipt_by_plate(plate: str, db: Session = Depends(get_db)):
         "plate": transaction.plate,
         "hours": transaction.hours,
         "amount": transaction.amount,
-        "transaction_type": transaction.transaction_type,
+        "transaction_type": transaction.Transaction_type,
         "time_in": parking.timein if parking else None,
         "time_out": parking.timeout if parking else None,
     }

@@ -3,9 +3,10 @@ from pydantic import BaseModel
 from enum import Enum
 from datetime import datetime
 
-class TransactionTypeEnum(str, Enum):
+class TicketOverviewEnum(str, Enum):
     new = "new"
     extend = "extend"
+    
 
 class TransactionResponse(BaseModel):
     id: int
@@ -15,7 +16,8 @@ class TransactionResponse(BaseModel):
     hours: float
     amount: float
     receipt_url: str
-    transaction_type: TransactionTypeEnum
+    transaction_type: str
+    Ticket_Overview: TicketOverviewEnum
     
     
     class Config:
@@ -28,7 +30,8 @@ class TransactionCreate(BaseModel):
     plate: str
     hours: float
     amount: float
-    transaction_type: TransactionTypeEnum
+    transaction_type: str
+    Ticket_Overview: TicketOverviewEnum
 
     class Config:
         from_attributes = True 

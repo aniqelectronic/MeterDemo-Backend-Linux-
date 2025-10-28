@@ -4,11 +4,10 @@ import enum
 
 
 
-# Enum for transaction type
-class TransactionTypeEnum(str, enum.Enum):
+# Enum for Ticket Overview
+class TicketOverviewEnum(str, enum.Enum):
     new = "new"
     extend = "extend"
-
 
 class TransactionParking(Base):   
     __tablename__ = "transaction_parkings"   
@@ -19,5 +18,6 @@ class TransactionParking(Base):
     plate = Column(String(50), index=True)
     hours = Column(Float, nullable=False)  # total hours paid
     amount = Column(Float, nullable=False)
+    Transaction_type = Column(String(50), nullable=False)
     receipt_url = Column(String(255), default="https://dummyurl.com/receipt/")
-    transaction_type = Column(Enum(TransactionTypeEnum), nullable=False)  # ✅ new column
+    Ticket_Overview = Column(Enum(TicketOverviewEnum), nullable=False) 
