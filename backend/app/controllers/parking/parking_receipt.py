@@ -1,21 +1,22 @@
 # app/utils/receipt.py
+
 from fpdf import FPDF
-import barcode
-from barcode.writer import ImageWriter
 import os
 import tempfile
 
 
-
 class ReceiptPDF(FPDF):
-    def __init__(self, logo_path=None):
+    def __init__(self, logo_bytes=None):
         super().__init__()
-        self.logo_path = logo_path
+        self.logo_bytes = logo_bytes
 
     def header(self):
-        if self.logo_path and os.path.exists(self.logo_path):
+        if self.logo_bytes:
             logo_width = 28
-            self.image(self.logo_path, x=(210 - logo_width) / 2, y=10, w=logo_width)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                tmp.write(self.logo_bytes)
+                tmp.flush()
+                self.image(tmp.name, x=(210 - logo_width) / 2, y=10, w=logo_width)
         self.ln(50)
 
         self.set_font("Arial", 'B', 20)
@@ -34,13 +35,8 @@ class ReceiptPDF(FPDF):
         self.cell(0, 10, "Thank you & Drive Safely!", 0, 0, 'C')
 
 
-def generate_parking_receipt(ticket_id, plate, hours, time_in, time_out, amount, transaction_type, logo_path):
-    """
-    Generates a professional parking receipt PDF.
-    Returns PDF bytes ready to upload or stream.
-    """
-    # --- Create PDF
-    pdf = ReceiptPDF(logo_path=logo_path)
+def generate_parking_receipt(ticket_id, plate, hours, time_in, time_out, amount, transaction_type, logo_bytes):
+    pdf = ReceiptPDF(logo_bytes=logo_bytes)
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=25)
     pdf.set_text_color(40, 40, 40)
@@ -68,6 +64,4 @@ def generate_parking_receipt(ticket_id, plate, hours, time_in, time_out, amount,
     pdf.line(30, pdf.get_y(), 180, pdf.get_y())
     pdf.ln(15)
 
-    pdf_bytes = pdf.output(dest="S").encode("latin1")
-
-    return pdf_bytes
+    return pdf.output(dest="S").encode("latin1")
