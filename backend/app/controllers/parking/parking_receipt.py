@@ -4,14 +4,22 @@ from reportlab.lib import colors
 from reportlab.pdfgen import canvas
 from io import BytesIO
 import datetime
+import os
 
-# ✅ Preload logo once at startup (fast, cached in memory)
+# === Preload logo once at startup for performance ===
+LOGO = None
+LOGO_PATH = "app/resources/images/PBT_Kuantan_logo.png"
+
 try:
-    with open("app/resources/images/PBT_Kuantan_logo.png", "rb") as f:
-        LOGO = ImageReader(BytesIO(f.read()))
+    if os.path.exists(LOGO_PATH):
+        with open(LOGO_PATH, "rb") as f:
+            LOGO = ImageReader(BytesIO(f.read()))
+        print("[INFO] Logo preloaded successfully.")
+    else:
+        print(f"[WARN] Logo not found at: {LOGO_PATH}")
 except Exception as e:
-    LOGO = None
-    print(f"[WARN] Logo not found or unreadable: {e}")
+    print(f"[WARN] Failed to load logo: {e}")
+
 
 def generate_parking_receipt(
     ticket_id: str,
@@ -27,16 +35,30 @@ def generate_parking_receipt(
     """
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4  # (595.27 x 841.89 points)
+    width, height = A4  # 595 x 842 points (A4 portrait)
 
     # === HEADER ===
     if LOGO:
-        c.drawImage(LOGO, (width - 120) / 2, height - 120, width=120, height=60, mask='auto')
+        try:
+            img_width, img_height = LOGO.getSize()
+            display_width = 120
+            aspect = img_height / img_width
+            display_height = display_width * aspect
 
+            # Center the logo horizontally
+            x = (width - display_width) / 2
+            y = height - (display_height + 60)
+
+            c.drawImage(LOGO, x, y, width=display_width, height=display_height, mask='auto')
+        except Exception as e:
+            print(f"[WARN] Failed to draw logo: {e}")
+
+    # Title
     c.setFont("Helvetica-Bold", 20)
     c.setFillColor(colors.HexColor("#222222"))
     c.drawCentredString(width / 2, height - 150, "PARKING E-RECEIPT")
 
+    # Date
     c.setFont("Helvetica", 12)
     c.setFillColor(colors.grey)
     c.drawCentredString(width / 2, height - 170, datetime.datetime.now().strftime("%d %b %Y, %I:%M %p"))
