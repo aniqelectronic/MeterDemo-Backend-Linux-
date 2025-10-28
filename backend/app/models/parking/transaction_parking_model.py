@@ -15,7 +15,6 @@ class TransactionResponse(BaseModel):
     plate: str
     hours: float
     amount: float
-    receipt_url: str
     transaction_type: str
     Ticket_Overview: TicketOverviewEnum
     
