@@ -15,7 +15,4 @@ azure-storage-blob
 fpdf==1.7.2
 python-barcode==0.15.1
 Pillow==10.3.0
-reportlab.lib.pagesizes
-reportlab.lib.utils 
-reportlab.lib 
-reportlab.pdfgen 
+reportlab
