@@ -14,13 +14,6 @@ import os
 import qrcode
 from io import BytesIO
 
-# Compute and cache the logo path only once
-LOGO_PATH = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "../../resources/images/PBT_Kuantan_logo.png")
-)
-with open(LOGO_PATH, "rb") as f:
-    LOGO_BYTES = f.read()
-
 # ----------------- CONFIG -----------------
 from app.utils.config import BASE_URL
 
@@ -70,7 +63,7 @@ def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
         time_out=parking.timeout if parking else "N/A",
         amount=transaction.amount,
         transaction_type= transaction.transaction_type if transaction else "N/A",
-        logo_bytes=LOGO_BYTES
+        #logo_bytes=LOGO_BYTES
         #logo_path=logo_path
     )
 
@@ -254,7 +247,7 @@ def get_latest_qr(db: Session = Depends(get_db)):
             time_out=parking.timeout if parking else "N/A",
             amount=tx.amount,
             transaction_type= tx.transaction_type if tx else "N/A",
-            logo_bytes=LOGO_BYTES
+            #logo_bytes=LOGO_BYTES
             #logo_path=logo_path
         )
 

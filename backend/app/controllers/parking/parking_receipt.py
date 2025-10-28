@@ -1,87 +1,79 @@
-# app/utils/receipt.py
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.utils import ImageReader
+from reportlab.lib import colors
+from reportlab.pdfgen import canvas
+from io import BytesIO
+import datetime
 
-from fpdf import FPDF
-import tempfile
-import os
+# ✅ Preload logo once at startup (fast, cached in memory)
+try:
+    with open("app/resources/images/PBT_Kuantan_logo.png", "rb") as f:
+        LOGO = ImageReader(BytesIO(f.read()))
+except Exception as e:
+    LOGO = None
+    print(f"[WARN] Logo not found or unreadable: {e}")
 
-# Global cached logo file path (to avoid re-writing it every time)
-LOGO_PATH = None
-
-
-def setup_logo_cache(logo_bytes: bytes) -> str:
+def generate_parking_receipt(
+    ticket_id: str,
+    plate_number: str,
+    hours: float,
+    time_in: datetime.datetime,
+    time_out: datetime.datetime,
+    amount: float,
+    transaction_type: str,
+):
     """
-    Save the logo bytes to a temporary file once and reuse the same file path
-    for all future PDF generations.
+    Generate a parking receipt as PDF bytes using ReportLab (fast + memory-safe)
     """
-    global LOGO_PATH
-    if LOGO_PATH is None:
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-        tmp.write(logo_bytes)
-        tmp.flush()
-        tmp.close()
-        LOGO_PATH = tmp.name
-    return LOGO_PATH
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4  # (595.27 x 841.89 points)
 
+    # === HEADER ===
+    if LOGO:
+        c.drawImage(LOGO, (width - 120) / 2, height - 120, width=120, height=60, mask='auto')
 
-class ReceiptPDF(FPDF):
-    def __init__(self, logo_bytes=None):
-        super().__init__()
-        self.logo_bytes = logo_bytes
+    c.setFont("Helvetica-Bold", 20)
+    c.setFillColor(colors.HexColor("#222222"))
+    c.drawCentredString(width / 2, height - 150, "PARKING E-RECEIPT")
 
-    def header(self):
-        if self.logo_bytes:
-            logo_width = 28
-            # ✅ Use cached logo path instead of BytesIO (faster and fixes error)
-            logo_path = setup_logo_cache(self.logo_bytes)
-            self.image(logo_path, x=(210 - logo_width) / 2, y=10, w=logo_width)
+    c.setFont("Helvetica", 12)
+    c.setFillColor(colors.grey)
+    c.drawCentredString(width / 2, height - 170, datetime.datetime.now().strftime("%d %b %Y, %I:%M %p"))
 
-        self.ln(50)
-        self.set_font("Arial", 'B', 20)
-        self.set_text_color(30, 30, 30)
-        self.cell(0, 10, "PARKING E-RECEIPT", ln=True, align="C")
-        self.ln(4)
-        self.set_draw_color(180, 180, 180)
-        self.set_line_width(0.6)
-        self.line(30, self.get_y(), 180, self.get_y())
-        self.ln(10)
+    # === DETAILS SECTION ===
+    y = height - 210
+    line_height = 22
+    text_color = colors.HexColor("#000000")
 
-    def footer(self):
-        self.set_y(-22)
-        self.set_font("Arial", 'I', 11)
-        self.set_text_color(90, 90, 90)
-        self.cell(0, 10, "Thank you & Drive Safely!", 0, 0, 'C')
+    details = [
+        ("Ticket ID", ticket_id),
+        ("Plate Number", plate_number),
+        ("Parking Duration", f"{hours:.2f} hour(s)"),
+        ("Time In", time_in.strftime("%d/%m/%Y %I:%M %p")),
+        ("Time Out", time_out.strftime("%d/%m/%Y %I:%M %p")),
+        ("Transaction Type", transaction_type.capitalize()),
+        ("Amount Paid (RM)", f"{amount:.2f}"),
+    ]
 
+    for label, value in details:
+        c.setFont("Helvetica-Bold", 12)
+        c.setFillColor(text_color)
+        c.drawString(80, y, f"{label}:")
+        c.setFont("Helvetica", 12)
+        c.drawString(230, y, str(value))
+        y -= line_height
 
-def generate_parking_receipt(ticket_id, plate, hours, time_in, time_out, amount, transaction_type, logo_bytes):
-    """
-    Generate a parking e-receipt PDF and return it as bytes.
-    """
-    pdf = ReceiptPDF(logo_bytes=logo_bytes)
-    pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=25)
-    pdf.set_text_color(40, 40, 40)
-    pdf.set_font("Arial", '', 12)
+    # === FOOTER ===
+    c.setStrokeColor(colors.grey)
+    c.line(60, 100, width - 60, 100)
+    c.setFont("Helvetica-Oblique", 10)
+    c.setFillColor(colors.grey)
+    c.drawCentredString(width / 2, 80, "Thank you for parking with us.")
+    c.drawCentredString(width / 2, 65, "Have a safe journey!")
 
-    info = {
-        "Ticket ID": ticket_id,
-        "Plate": plate,
-        "Time Purchased (Hours)": hours,
-        "Time In": time_in,
-        "Time Out": time_out,
-        "Transaction Type": transaction_type,
-        "Amount": f"RM {amount:.2f}",
-    }
-
-    for label, value in info.items():
-        pdf.set_font("Arial", 'B', 12)
-        pdf.cell(60, 10, f"{label}:", border=0)
-        pdf.set_font("Arial", '', 12)
-        pdf.cell(0, 10, str(value), border=0, ln=True)
-
-    pdf.ln(15)
-    pdf.set_draw_color(200, 200, 200)
-    pdf.set_line_width(0.4)
-    pdf.line(30, pdf.get_y(), 180, pdf.get_y())
-    pdf.ln(15)
-
-    return pdf.output(dest="S").encode("latin1")
+    # === FINALIZE PDF ===
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer.read()
