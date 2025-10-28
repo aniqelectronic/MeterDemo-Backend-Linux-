@@ -38,17 +38,6 @@ def generate_parking_receipt(ticket_id, plate, hours, time_in, time_out, amount,
     Generates a professional parking receipt PDF.
     Returns PDF bytes ready to upload or stream.
     """
-    # --- Temporary barcode file
-    tmp_file = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-    barcode_img_path = tmp_file.name
-    tmp_file.close()
-
-    # --- Barcode generation
-    code128 = barcode.get('code128', ticket_id, writer=ImageWriter())
-    barcode_options = {"module_height": 7.0, "font_size": 8}
-    code128.save(barcode_img_path.replace(".png", ""), options=barcode_options)
-    barcode_img_path = barcode_img_path.replace(".png", ".png")
-
     # --- Create PDF
     pdf = ReceiptPDF(logo_path=logo_path)
     pdf.add_page()
@@ -78,12 +67,6 @@ def generate_parking_receipt(ticket_id, plate, hours, time_in, time_out, amount,
     pdf.line(30, pdf.get_y(), 180, pdf.get_y())
     pdf.ln(15)
 
-    barcode_width = 40
-    barcode_x = (210 - barcode_width) / 2
-    pdf.image(barcode_img_path, x=barcode_x, w=barcode_width)
-    pdf.ln(8)
-
     pdf_bytes = pdf.output(dest="S").encode("latin1")
-    os.remove(barcode_img_path)
 
     return pdf_bytes
