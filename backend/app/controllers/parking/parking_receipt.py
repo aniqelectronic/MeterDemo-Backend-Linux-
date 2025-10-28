@@ -1,9 +1,7 @@
 # app/utils/receipt.py
-
 from fpdf import FPDF
 import os
-import tempfile
-
+from io import BytesIO
 
 class ReceiptPDF(FPDF):
     def __init__(self, logo_bytes=None):
@@ -13,10 +11,8 @@ class ReceiptPDF(FPDF):
     def header(self):
         if self.logo_bytes:
             logo_width = 28
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-                tmp.write(self.logo_bytes)
-                tmp.flush()
-                self.image(tmp.name, x=(210 - logo_width) / 2, y=10, w=logo_width)
+            # ✅ Use image from memory (no temp file)
+            self.image(BytesIO(self.logo_bytes), x=(210 - logo_width) / 2, y=10, w=logo_width)
         self.ln(50)
 
         self.set_font("Arial", 'B', 20)
