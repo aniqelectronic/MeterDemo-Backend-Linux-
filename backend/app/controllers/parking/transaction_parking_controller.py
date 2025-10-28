@@ -39,11 +39,25 @@ def get_all_transactions(db: Session = Depends(get_db)):
 # ---------------- RECEIPT (HTML PAGE) ----------------
 @router.get("/receipt/view/{ticket_id}", response_class=HTMLResponse)
 def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
-    transaction = db.query(TransactionParking).filter(TransactionParking.ticket_id == ticket_id).first()
+
+    transaction = (
+        db.query(TransactionParking)
+        .filter(TransactionParking.ticket_id == ticket_id)
+        .first()
+    )
     if not transaction:
         raise HTTPException(status_code=404, detail="Ticket not found")
-        
-    parking = db.query(Parking).filter(Parking.plate == transaction.plate).order_by(Parking.id.desc()).first()
+
+    parking = (
+        db.query(Parking)
+        .filter(Parking.plate == transaction.plate)
+        .order_by(Parking.id.desc())
+        .first()
+    )
+
+
+    db.expunge_all()
+    db.close()
     
     #base_dir = os.path.dirname(os.path.abspath(__file__))
     #logo_path = os.path.abspath(os.path.join(base_dir, "../../resources/images/PBT_Kuantan_logo.png"))
@@ -219,7 +233,15 @@ def get_latest_qr(db: Session = Depends(get_db)):
     if not tx:
         raise HTTPException(status_code=404, detail="No transactions found")
 
-    parking = db.query(Parking).filter(Parking.plate == tx.plate).order_by(Parking.id.desc()).first()
+    parking = (
+        db.query(Parking)
+        .filter(Parking.plate == tx.plate)
+        .order_by(Parking.id.desc())
+        .first()
+    )
+
+    db.expunge_all()
+    db.close()
 
     #base_dir = os.path.dirname(os.path.abspath(__file__))
     #logo_path = os.path.abspath(os.path.join(base_dir, "../../resources/images/PBT_Kuantan_logo.png"))
