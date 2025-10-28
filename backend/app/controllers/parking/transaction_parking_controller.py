@@ -8,14 +8,7 @@ from app.schema.parking.transaction_parking_schema import TransactionParking
 from app.models.parking.transaction_parking_model import TransactionResponse
 from app.utils.blob_upload import upload_to_blob
 from app.controllers.parking.parking_receipt import generate_parking_receipt
-
-
-
-
-
 from app.schema.parking.parking_schema import Parking
-
-
 from fpdf import FPDF
 import os
 import qrcode
@@ -45,8 +38,6 @@ def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
         
     parking = db.query(Parking).filter(Parking.plate == transaction.plate).order_by(Parking.id.desc()).first()
     
-        # ✅ Generate PDF receipt
-        # ✅ Generate PDF first
     base_dir = os.path.dirname(os.path.abspath(__file__))
     logo_path = os.path.abspath(os.path.join(base_dir, "../../resources/images/PBT_Kuantan_logo.png"))
     
@@ -176,11 +167,8 @@ def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
     filename = f"receipt_{transaction.ticket_id}.html"
     html_url = upload_to_blob(filename, html_bytes, content_type="text/html")
 
-    transaction.receipt_url = html_url
-    db.commit()
-
     # Generate QR for Blob URL
-    receipt_url = transaction.receipt_url
+    receipt_url = html_url
     qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
     qr.add_data(receipt_url)
     qr.make(fit=True)
@@ -223,15 +211,12 @@ def get_latest_qr(db: Session = Depends(get_db)):
     if not tx:
         raise HTTPException(status_code=404, detail="No transactions found")
 
-    # ✅ If receipt_url missing or not yet uploaded to blob, create it
-    if not tx.receipt_url or "blob.core.windows.net" not in tx.receipt_url:
-        parking = db.query(Parking).filter(Parking.plate == tx.plate).order_by(Parking.id.desc()).first()
+    parking = db.query(Parking).filter(Parking.plate == tx.plate).order_by(Parking.id.desc()).first()
 
-        # ✅ Generate PDF first
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        logo_path = os.path.abspath(os.path.join(base_dir, "../../resources/images/PBT_Kuantan_logo.png"))
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    logo_path = os.path.abspath(os.path.join(base_dir, "../../resources/images/PBT_Kuantan_logo.png"))
         
-        pdf_bytes = generate_parking_receipt(
+    pdf_bytes = generate_parking_receipt(
             ticket_id=tx.ticket_id,
             plate=tx.plate,
             hours=tx.hours,
@@ -243,10 +228,10 @@ def get_latest_qr(db: Session = Depends(get_db)):
         )
 
         # ✅ Upload the PDF to Azure Blob
-        pdf_filename = f"receipt_{tx.ticket_id}.pdf"
-        pdf_url = upload_to_blob(pdf_filename, pdf_bytes, content_type="application/pdf")
+    pdf_filename = f"receipt_{tx.ticket_id}.pdf"
+    pdf_url = upload_to_blob(pdf_filename, pdf_bytes, content_type="application/pdf")
         
-        html = f"""
+    html = f"""
         <html>
             <head>
                 <title>Parking E-Receipt</title>
@@ -354,18 +339,12 @@ def get_latest_qr(db: Session = Depends(get_db)):
             </body>
         </html>
         """
-        html_bytes = html.encode("utf-8")
-        filename = f"receipt_{tx.ticket_id}.html"
-        html_url = upload_to_blob(filename, html_bytes, content_type="text/html")
-
-        tx.receipt_url = html_url
-        db.commit()
-        print(f"✅ Uploaded to Azure Blob: {html_url}")
-    else:
-        print(f"ℹ️ Using existing blob URL: {tx.receipt_url}")
+    html_bytes = html.encode("utf-8")
+    filename = f"receipt_{tx.ticket_id}.html"
+    html_url = upload_to_blob(filename, html_bytes, content_type="text/html")
 
     # Generate QR for Blob URL
-    receipt_url = tx.receipt_url
+    receipt_url = html_url
     qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
     qr.add_data(receipt_url)
     qr.make(fit=True)

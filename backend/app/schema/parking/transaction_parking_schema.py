@@ -19,5 +19,4 @@ class TransactionParking(Base):
     hours = Column(Float, nullable=False)  # total hours paid
     amount = Column(Float, nullable=False)
     transaction_type = Column(String(50), nullable=False)
-    receipt_url = Column(String(255), default="https://dummyurl.com/receipt/")
     Ticket_Overview = Column(Enum(TicketOverviewEnum), nullable=False) 
