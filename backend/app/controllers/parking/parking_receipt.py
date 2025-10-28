@@ -15,7 +15,7 @@ except Exception as e:
 
 def generate_parking_receipt(
     ticket_id: str,
-    plate_number: str,
+    plate: str,
     hours: float,
     time_in: datetime.datetime,
     time_out: datetime.datetime,
@@ -48,7 +48,7 @@ def generate_parking_receipt(
 
     details = [
         ("Ticket ID", ticket_id),
-        ("Plate Number", plate_number),
+        ("Plate Number", plate),
         ("Parking Duration", f"{hours:.2f} hour(s)"),
         ("Time In", time_in.strftime("%d/%m/%Y %I:%M %p")),
         ("Time Out", time_out.strftime("%d/%m/%Y %I:%M %p")),
