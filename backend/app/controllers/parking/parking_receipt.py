@@ -38,6 +38,9 @@ def generate_parking_receipt(
     width, height = A4  # 595 x 842 points (A4 portrait)
 
     # === HEADER ===
+    top_y = height - 100  # Start about 100 pts from top
+    text_after_logo_y = top_y - 30  # fallback if no logo
+
     if LOGO:
         try:
             img_width, img_height = LOGO.getSize()
@@ -45,26 +48,33 @@ def generate_parking_receipt(
             aspect = img_height / img_width
             display_height = display_width * aspect
 
-            # Center the logo horizontally
+            # Center logo horizontally
             x = (width - display_width) / 2
-            y = height - (display_height + 60)
+            y = top_y - display_height
 
             c.drawImage(LOGO, x, y, width=display_width, height=display_height, mask='auto')
+
+            # set text position just below logo
+            text_after_logo_y = y - 25
+
         except Exception as e:
             print(f"[WARN] Failed to draw logo: {e}")
 
-    # Title
+    # === TITLE ===
     c.setFont("Helvetica-Bold", 20)
     c.setFillColor(colors.HexColor("#222222"))
-    c.drawCentredString(width / 2, height - 150, "PARKING E-RECEIPT")
+    c.drawCentredString(width / 2, text_after_logo_y, "PARKING E-RECEIPT")
 
-    # Date
+    # === DATE ===
     c.setFont("Helvetica", 12)
     c.setFillColor(colors.grey)
-    c.drawCentredString(width / 2, height - 170, datetime.datetime.now().strftime("%d %b %Y, %I:%M %p"))
+    c.drawCentredString(
+        width / 2, text_after_logo_y - 18,
+        datetime.datetime.now().strftime("%d %b %Y, %I:%M %p")
+    )
 
     # === DETAILS SECTION ===
-    y = height - 210
+    y = text_after_logo_y - 60
     line_height = 22
     text_color = colors.HexColor("#000000")
 
