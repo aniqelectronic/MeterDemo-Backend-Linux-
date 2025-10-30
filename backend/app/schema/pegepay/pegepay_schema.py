@@ -5,8 +5,8 @@ class PegepayOrder(Base):
     __tablename__ = "pegepay_orders"
 
     id = Column(Integer, primary_key=True, index=True)
-    order_no = Column(String, unique=True, index=True)
+    order_no = Column(String(50), unique=True, index=True)
     order_amount = Column(Float)
-    order_status = Column(String)
-    store_id = Column(String)
-    terminal_id = Column(String)
+    order_status = Column(String(50))
+    store_id = Column(String(100))
+    terminal_id = Column(String(100))
