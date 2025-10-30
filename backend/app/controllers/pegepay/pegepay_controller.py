@@ -122,27 +122,34 @@ def check_order_status(body: OrderStatusRequest, db: Session = Depends(get_db)):
 
     data = response.json()
 
-    # ✅ Ensure structure is correct
-    if "content" not in data:
-        raise HTTPException(status_code=500, detail="Invalid Pegepay response structure")
+    # ✅ Check that response has content
+    if data.get("status") != "success" or "content" not in data:
+        raise HTTPException(status_code=500, detail="Invalid Pegepay response")
 
     content = data["content"]
     order_status = content.get("order_status")
 
-    # ✅ Check status correctly inside "content"
+    # ✅ Read correctly from inside "content"
     if order_status != "successful":
-        raise HTTPException(status_code=400, detail=f"Payment not successful yet (status: {order_status})")
+        return {
+            "message": f"Payment not successful yet (current status: {order_status})",
+            "content": content
+        }
 
-    # ✅ Update DB when successful
+    # ✅ Update DB if successful
     order = db.query(PegepayOrder).filter_by(order_no=body.order_no).first()
     if order:
         order.order_status = order_status
+        order.order_amount = content.get("order_amount")
+        order.store_id = content.get("store_id")
+        order.terminal_id = content.get("terminal_id")
         db.commit()
         db.refresh(order)
 
     return {
         "order_no": content.get("order_no"),
-        "order_status": order_status
+        "order_status": order_status,
+        "bank_trx_no": content.get("bank_trx_no")
     }
 
 
