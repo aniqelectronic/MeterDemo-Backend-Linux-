@@ -52,9 +52,15 @@ def auto_refresh_token():
 
 @router.post("/create-order")
 def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
-    # Generate new order_no
+    # Find the latest order
     last_order = db.query(PegepayOrder).order_by(PegepayOrder.id.desc()).first()
-    next_no = f"KN{(last_order.id + 1) if last_order else 1:03d}"
+
+    # ✅ If last order exists and not successful, reuse its order_no
+    if last_order and last_order.order_status != "successful":
+        next_no = last_order.order_no
+    else:
+        # Otherwise generate a new one
+        next_no = f"KN{(last_order.id + 1) if last_order else 1:03d}"
 
     payload = {
         "order_output": "online",
@@ -77,25 +83,30 @@ def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
 
     res_data = response.json()
 
-     # Extract iframe_url
     iframe_url = res_data.get("content", {}).get("iframe_url")
     if not iframe_url:
         raise HTTPException(status_code=500, detail="iframe_url not found in Pegepay response")
 
-    # Save order in DB
-    new_order = PegepayOrder(
-        order_no=next_no,
-        order_amount=body.order_amount,
-        order_status="unprocessed",
-        store_id=body.store_id,
-        terminal_id=body.terminal_id
-    )
-    db.add(new_order)
-    db.commit()
-    db.refresh(new_order)
+    # ✅ If reused existing order, just update amount/status instead of inserting new row
+    if last_order and last_order.order_no == next_no:
+        last_order.order_amount = body.order_amount
+        last_order.order_status = "unprocessed"
+        db.commit()
+        db.refresh(last_order)
+    else:
+        new_order = PegepayOrder(
+            order_no=next_no,
+            order_amount=body.order_amount,
+            order_status="unprocessed",
+            store_id=body.store_id,
+            terminal_id=body.terminal_id
+        )
+        db.add(new_order)
+        db.commit()
+        db.refresh(new_order)
 
-    # Return only the iframe URL and next_no
-    return {"iframe_url": iframe_url,"order_no": next_no}
+    return {"iframe_url": iframe_url, "order_no": next_no}
+
 
     
 # ---------------------- Check Status ----------------------
