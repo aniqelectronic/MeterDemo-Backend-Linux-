@@ -1,9 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends
 import requests, time
-from app.models.pegepay.pegepay_model import OrderCreateRequest, OrderStatusRequest
 from sqlalchemy.orm import Session
+from app.models.pegepay.pegepay_model import OrderCreateRequest, OrderStatusRequest
 from app.db.database import get_db
-from app.schema.pegepay.pegepay_schema import PegepayOrder
+from app.schema.pegepay.pegepay_schema import PegepayOrder, PegepayToken
 from app.utils.config import refresh_token
 
 router = APIRouter(prefix="/pegepay", tags=["Pegepay"])
@@ -12,25 +12,21 @@ PEPAY_TOKEN_URL = "https://pegepay.com/api/get-access-token"
 PEPAY_ORDER_URL = "https://pegepay.com/api/npd-wa/order-create/custom-validity"
 PEPAY_STATUS_URL = "https://pegepay.com/api/pos/transaction-details"
 
-# ---------------------- TOKEN CACHE ----------------------
-cached_token = {"access_token": None, "token_expired_at": 0}
 
-
-def get_pegepay_token():
+def get_pegepay_token(db: Session):
     """
-    Returns a valid Pegepay token.
-    Refreshes automatically when expired.
+    Return a valid Pegepay token (shared via DB).
+    Auto-refreshes when expired.
     """
     current_time_ms = int(time.time() * 1000)
 
-    # ✅ Use cached token if still valid
-    if (
-        cached_token["access_token"]
-        and current_time_ms < cached_token["token_expired_at"]
-    ):
-        return cached_token["access_token"]
+    token_entry = db.query(PegepayToken).order_by(PegepayToken.id.desc()).first()
 
-    # 🔄 Otherwise refresh
+    # ✅ Still valid
+    if token_entry and current_time_ms < token_entry.token_expired_at:
+        return token_entry.access_token
+
+    # 🔄 Refresh from Pegepay
     headers = {"Content-Type": "application/json"}
     payload = {"refresh_token": refresh_token}
 
@@ -45,9 +41,16 @@ def get_pegepay_token():
     if not access_token:
         raise HTTPException(status_code=500, detail="Access token not found in Pegepay response")
 
-    # ✅ Cache for reuse
-    cached_token["access_token"] = access_token
-    cached_token["token_expired_at"] = token_expired_at
+    # ✅ Save to DB (replace existing)
+    if token_entry:
+        token_entry.access_token = access_token
+        token_entry.token_expired_at = token_expired_at
+    else:
+        token_entry = PegepayToken(access_token=access_token, token_expired_at=token_expired_at)
+        db.add(token_entry)
+
+    db.commit()
+    db.refresh(token_entry)
 
     return access_token
 
@@ -55,9 +58,11 @@ def get_pegepay_token():
 # ---------------------- Create Order ----------------------
 @router.post("/create-order")
 def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
+    
     # Always generate a new order number
     last_order = db.query(PegepayOrder).order_by(PegepayOrder.id.desc()).first()
     next_no = f"KN{(last_order.id + 1) if last_order else 1:03d}"
+
 
     payload = {
         "order_output": "online",
@@ -71,7 +76,7 @@ def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
         "shift_id": body.shift_id
     }
 
-    access_token = get_pegepay_token()
+    access_token = get_pegepay_token(db)
     headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
 
     response = requests.post(PEPAY_ORDER_URL, json=payload, headers=headers)
@@ -80,30 +85,33 @@ def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
 
     res_data = response.json()
     iframe_url = res_data.get("content", {}).get("iframe_url")
-
     if not iframe_url:
         raise HTTPException(status_code=500, detail="iframe_url not found in Pegepay response")
 
-    # Always create a new DB record
-    new_order = PegepayOrder(
-        order_no=next_no,
-        order_amount=body.order_amount,
-        order_status="unprocessed",
-        store_id=body.store_id,
-        terminal_id=body.terminal_id
-    )
-    db.add(new_order)
-    db.commit()
-    db.refresh(new_order)
+    if last_order and last_order.order_no == next_no:
+        last_order.order_amount = body.order_amount
+        last_order.order_status = "unprocessed"
+        db.commit()
+        db.refresh(last_order)
+    else:
+        new_order = PegepayOrder(
+            order_no=next_no,
+            order_amount=body.order_amount,
+            order_status="unprocessed",
+            store_id=body.store_id,
+            terminal_id=body.terminal_id
+        )
+        db.add(new_order)
+        db.commit()
+        db.refresh(new_order)
 
     return {"iframe_url": iframe_url, "order_no": next_no}
-
 
 
 # ---------------------- Check Status ----------------------
 @router.post("/check-status")
 def check_order_status(body: OrderStatusRequest, db: Session = Depends(get_db)):
-    access_token = get_pegepay_token()
+    access_token = get_pegepay_token(db)
     headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
     payload = {"order_no": body.order_no}
 
@@ -135,19 +143,3 @@ def check_order_status(body: OrderStatusRequest, db: Session = Depends(get_db)):
         "order_status": order_status,
         "bank_trx_no": content.get("bank_trx_no")
     }
-
-# ---------------------- Get All Orders ----------------------
-@router.get("/get-all-orders")
-def get_all_orders(db: Session = Depends(get_db)):
-    orders = db.query(PegepayOrder).all()
-    return [
-        {
-            "id": o.id,
-            "order_no": o.order_no,
-            "order_amount": o.order_amount,
-            "order_status": o.order_status,
-            "store_id": o.store_id,
-            "terminal_id": o.terminal_id
-        }
-        for o in orders
-    ]
