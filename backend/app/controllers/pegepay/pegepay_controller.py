@@ -127,7 +127,7 @@ def check_order_status(body: OrderStatusRequest, db: Session = Depends(get_db)):
     order_status = content.get("order_status")
 
     if order_status != "successful":
-        return {"message": f"Payment not successful yet (current status: {order_status})", "content": content}
+        return {"message": f"Payment not successful yet (current status: {order_status})", "order_status": order_status}
 
     order = db.query(PegepayOrder).filter_by(order_no=body.order_no).first()
     if order:
