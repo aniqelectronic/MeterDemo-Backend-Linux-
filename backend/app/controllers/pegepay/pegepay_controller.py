@@ -143,3 +143,19 @@ def check_order_status(body: OrderStatusRequest, db: Session = Depends(get_db)):
         "order_status": order_status,
         "bank_trx_no": content.get("bank_trx_no")
     }
+
+# ---------------------- Get All Orders ----------------------
+@router.get("/get-all-orders")
+def get_all_orders(db: Session = Depends(get_db)):
+    orders = db.query(PegepayOrder).all()
+    return [
+        {
+            "id": o.id,
+            "order_no": o.order_no,
+            "order_amount": o.order_amount,
+            "order_status": o.order_status,
+            "store_id": o.store_id,
+            "terminal_id": o.terminal_id
+        }
+        for o in orders
+    ]
