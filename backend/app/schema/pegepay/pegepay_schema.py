@@ -15,5 +15,5 @@ class PegepayToken(Base):
     __tablename__ = "pegepay_token"
 
     id = Column(Integer, primary_key=True, index=True)
-    access_token = Column(String, nullable=False)
+    access_token = Column(String(512), nullable=False)
     token_expired_at = Column(BigInteger, nullable=False)
