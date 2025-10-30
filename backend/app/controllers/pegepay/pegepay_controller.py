@@ -38,6 +38,16 @@ def refresh_pegepay_token():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ---------------------- ✅ AUTO REFRESH TOKEN ----------------------
+@router.post("/auto-refresh-token")
+def auto_refresh_token():
+    """
+    Call this endpoint to refresh Pegepay access token manually.
+    """
+    access_token = refresh_pegepay_token()
+    return {"access_token": access_token}
+
+
 # ---------------------- Create Order ----------------------
 
 @router.post("/create-order")
