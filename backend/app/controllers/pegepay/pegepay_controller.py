@@ -39,6 +39,7 @@ def refresh_pegepay_token():
 
 
 # ---------------------- Create Order ----------------------
+
 @router.post("/create-order")
 def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
     # Generate new order_no
@@ -85,8 +86,9 @@ def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
 
     # Return only the iframe URL and next_no
     return {"iframe_url": iframe_url,"order_no": next_no}
-    
 
+    
+# ---------------------- Check Status ----------------------
 @router.post("/check-status")
 def check_order_status(body: OrderStatusRequest, db: Session = Depends(get_db)):
     access_token = refresh_pegepay_token()
@@ -110,3 +112,21 @@ def check_order_status(body: OrderStatusRequest, db: Session = Depends(get_db)):
         db.commit()
 
     return {"order_status": content.get("order_status")}
+
+
+# ---------------------- Get All Orders ----------------------
+
+@router.get("/get-all-orders")
+def get_all_orders(db: Session = Depends(get_db)):
+    orders = db.query(PegepayOrder).all()
+    return [
+        {
+            "id": o.id,
+            "order_no": o.order_no,
+            "order_amount": o.order_amount,
+            "order_status": o.order_status,
+            "store_id": o.store_id,
+            "terminal_id": o.terminal_id
+        }
+        for o in orders
+    ]
