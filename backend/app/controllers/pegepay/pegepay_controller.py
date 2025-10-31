@@ -162,17 +162,22 @@ def check_order_status(body: OrderStatusRequest, db: Session = Depends(get_db)):
     content = data["content"]
     order_status = content.get("order_status")
 
+    # 🟡 If not successful, return directly — no DB update needed
     if order_status != "successful":
-        return {"message": f"Payment not successful yet (current status: {order_status})", "order_status": order_status}
+        return {
+            "order_no": content.get("order_no"),
+            "order_status": order_status,
+            "message": f"Payment not successful yet (current status: {order_status})"
+        }
 
-    order = db.query(PegepayOrder).filter_by(order_no=body.order_no).first()
-    if order:
-        order.order_status = order_status
-        order.order_amount = content.get("order_amount")
-        order.store_id = content.get("store_id")
-        order.terminal_id = content.get("terminal_id")
-        db.commit()
-        db.refresh(order)
+    # ✅ Only update DB when payment is successful
+    db.query(PegepayOrder).filter_by(order_no=body.order_no).update({
+        PegepayOrder.order_status: order_status,
+        PegepayOrder.order_amount: content.get("order_amount"),
+        PegepayOrder.store_id: content.get("store_id"),
+        PegepayOrder.terminal_id: content.get("terminal_id"),
+    })
+    db.commit()
 
     return {
         "order_no": content.get("order_no"),
