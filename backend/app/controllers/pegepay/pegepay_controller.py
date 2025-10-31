@@ -58,16 +58,48 @@ def get_pegepay_token(db: Session):
 # ---------------------- Create Order ----------------------
 @router.post("/create-order")
 def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
-    
-    # Always generate a new order number
-    last_order = db.query(PegepayOrder).order_by(PegepayOrder.id.desc()).first()
-    next_no = f"KN{(last_order.id + 1) if last_order else 1:03d}"
+    terminal_prefix = f"TXN-{body.terminal_id}-"
 
+    # ✅ Step 1: Check if there's an unprocessed order for this terminal
+    existing_order = (
+        db.query(PegepayOrder)
+        .filter(PegepayOrder.order_no.like(f"{terminal_prefix}%"))
+        .filter(PegepayOrder.order_status == "unprocessed")
+        .order_by(PegepayOrder.id.desc())
+        .first()
+    )
 
+    if existing_order:
+        # ✅ Reuse the same order_no
+        order_no = existing_order.order_no
+        print(f"Reusing unprocessed order: {order_no} for {body.terminal_id}")
+    else:
+        # ✅ Step 2: Generate new number for this terminal
+        last_order = (
+            db.query(PegepayOrder)
+            .filter(PegepayOrder.order_no.like(f"{terminal_prefix}%"))
+            .order_by(PegepayOrder.id.desc())
+            .first()
+        )
+
+        if last_order and last_order.order_no.startswith(terminal_prefix):
+            # Extract numeric part (e.g. TXN-KN08-000015 -> 15)
+            try:
+                last_number = int(last_order.order_no.split("-")[-1])
+            except ValueError:
+                last_number = 0
+        else:
+            last_number = 0
+
+        next_number = last_number + 1
+        order_no = f"{terminal_prefix}{next_number:06d}"  # e.g. TXN-KN08-000001
+        print(f"Creating new order: {order_no}")
+
+    # ✅ Step 3: Prepare PegePay payload
     payload = {
         "order_output": "online",
         "image_file_format": "png",
-        "order_no": next_no,
+        "order_no": order_no,
         "override_existing_unprocessed_order_no": "yes",
         "order_amount": str(body.order_amount),
         "qr_validity": str(body.qr_validity),
@@ -76,6 +108,7 @@ def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
         "shift_id": body.shift_id
     }
 
+    # ✅ Step 4: Get valid PegePay token
     access_token = get_pegepay_token(db)
     headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
 
@@ -88,14 +121,16 @@ def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
     if not iframe_url:
         raise HTTPException(status_code=500, detail="iframe_url not found in Pegepay response")
 
-    if last_order and last_order.order_no == next_no:
-        last_order.order_amount = body.order_amount
-        last_order.order_status = "unprocessed"
+    # ✅ Step 5: Save or update DB
+    if existing_order:
+        existing_order.order_amount = body.order_amount
+        existing_order.order_status = "unprocessed"
+        existing_order.store_id = body.store_id
         db.commit()
-        db.refresh(last_order)
+        db.refresh(existing_order)
     else:
         new_order = PegepayOrder(
-            order_no=next_no,
+            order_no=order_no,
             order_amount=body.order_amount,
             order_status="unprocessed",
             store_id=body.store_id,
@@ -105,7 +140,8 @@ def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(new_order)
 
-    return {"iframe_url": iframe_url, "order_no": next_no}
+    return {"iframe_url": iframe_url, "order_no": order_no}
+
 
 
 # ---------------------- Check Status ----------------------
