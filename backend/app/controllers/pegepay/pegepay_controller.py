@@ -58,7 +58,9 @@ def get_pegepay_token(db: Session):
 # ---------------------- Create Order ----------------------
 @router.post("/create-order")
 def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
-    terminal_prefix = f"TXN-{body.terminal_id}-"
+    # ✅ Always use KN08 instead of full terminal name
+    terminal_code = "KN08"  # fixed short code
+    terminal_prefix = f"TXN-{terminal_code}-"
 
     # ✅ Step 1: Check if there's an unprocessed order for this terminal
     existing_order = (
@@ -70,11 +72,10 @@ def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
     )
 
     if existing_order:
-        # ✅ Reuse the same order_no
         order_no = existing_order.order_no
-        print(f"Reusing unprocessed order: {order_no} for {body.terminal_id}")
+        print(f"Reusing unprocessed order: {order_no} for {terminal_code}")
     else:
-        # ✅ Step 2: Generate new number for this terminal
+        # ✅ Step 2: Generate next running number
         last_order = (
             db.query(PegepayOrder)
             .filter(PegepayOrder.order_no.like(f"{terminal_prefix}%"))
@@ -83,7 +84,6 @@ def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
         )
 
         if last_order and last_order.order_no.startswith(terminal_prefix):
-            # Extract numeric part (e.g. TXN-KN08-000015 -> 15)
             try:
                 last_number = int(last_order.order_no.split("-")[-1])
             except ValueError:
@@ -93,7 +93,7 @@ def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
 
         next_number = last_number + 1
 
-        # ✅ Ensure order_no length ≤ 15 chars
+        # ✅ Keep within 15-character PegePay limit
         max_length = 15 - len(terminal_prefix)
         order_no = f"{terminal_prefix}{str(next_number).zfill(max_length)}"[:15]
 
@@ -108,7 +108,7 @@ def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
         "order_amount": str(body.order_amount),
         "qr_validity": str(body.qr_validity),
         "store_id": body.store_id,
-        "terminal_id": body.terminal_id,
+        "terminal_id": body.terminal_id,  # still use full name for API, just not in order_no
         "shift_id": body.shift_id
     }
 
