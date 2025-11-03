@@ -92,7 +92,11 @@ def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
             last_number = 0
 
         next_number = last_number + 1
-        order_no = f"{terminal_prefix}{next_number:06d}"  # e.g. TXN-KN08-000001
+
+        # ✅ Ensure order_no length ≤ 15 chars
+        max_length = 15 - len(terminal_prefix)
+        order_no = f"{terminal_prefix}{str(next_number).zfill(max_length)}"[:15]
+
         print(f"Creating new order: {order_no}")
 
     # ✅ Step 3: Prepare PegePay payload
