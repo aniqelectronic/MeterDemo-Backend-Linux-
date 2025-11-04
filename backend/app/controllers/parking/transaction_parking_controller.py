@@ -402,7 +402,7 @@ def get_latest_qr(db: Session = Depends(get_db)):
             <div class="thankyou">Thank you for choosing City Car Park</div>
   
             <div class="download-btn">
-              <a href="{pdf_url}" target="_blank">Download / Print</a>
+              <a href="{pdf_url}" target="_blank">Download PDF</a>
             </div>
   
             <div class="footer">
