@@ -58,14 +58,14 @@ def get_pegepay_token(db: Session):
 # ---------------------- Create Order ----------------------
 @router.post("/create-order")
 def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
-    # ✅ Always use KN08 instead of full terminal name
-    terminal_code = "KN08"  # fixed short code
+    # ✅ Step 1: Use terminal_id as the code
+    terminal_code = body.terminal_id.strip()  # e.g. "KN08"
     terminal_prefix = f"TXN-{terminal_code}-"
 
-    # ✅ Step 1: Check if there's an unprocessed order for this terminal
+    # ✅ Step 2: Check for unprocessed order for this specific terminal_id
     existing_order = (
         db.query(PegepayOrder)
-        .filter(PegepayOrder.order_no.like(f"{terminal_prefix}%"))
+        .filter(PegepayOrder.terminal_id == terminal_code)
         .filter(PegepayOrder.order_status == "unprocessed")
         .order_by(PegepayOrder.id.desc())
         .first()
@@ -73,11 +73,12 @@ def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
 
     if existing_order:
         order_no = existing_order.order_no
-        print(f"Reusing unprocessed order: {order_no} for {terminal_code}")
+        print(f"Reusing unprocessed order: {order_no} for terminal {terminal_code}")
     else:
-        # ✅ Step 2: Generate next running number
+        # ✅ Step 3: Find last order for this terminal_id
         last_order = (
             db.query(PegepayOrder)
+            .filter(PegepayOrder.terminal_id == terminal_code)
             .filter(PegepayOrder.order_no.like(f"{terminal_prefix}%"))
             .order_by(PegepayOrder.id.desc())
             .first()
@@ -93,13 +94,13 @@ def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
 
         next_number = last_number + 1
 
-        # ✅ Keep within 15-character PegePay limit
+        # ✅ Keep within PegePay 15-character limit
         max_length = 15 - len(terminal_prefix)
         order_no = f"{terminal_prefix}{str(next_number).zfill(max_length)}"[:15]
 
-        print(f"Creating new order: {order_no}")
+        print(f"Creating new order: {order_no} for terminal {terminal_code}")
 
-    # ✅ Step 3: Prepare PegePay payload
+    # ✅ Step 4: Prepare PegePay payload
     payload = {
         "order_output": "online",
         "image_file_format": "png",
@@ -108,11 +109,11 @@ def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
         "order_amount": str(body.order_amount),
         "qr_validity": str(body.qr_validity),
         "store_id": body.store_id,
-        "terminal_id": body.terminal_id,  # still use full name for API, just not in order_no
+        "terminal_id": terminal_code,  # use the same for API call
         "shift_id": body.shift_id
     }
 
-    # ✅ Step 4: Get valid PegePay token
+    # ✅ Step 5: Get valid PegePay token
     access_token = get_pegepay_token(db)
     headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
 
@@ -125,7 +126,7 @@ def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
     if not iframe_url:
         raise HTTPException(status_code=500, detail="iframe_url not found in Pegepay response")
 
-    # ✅ Step 5: Save or update DB
+    # ✅ Step 6: Save or update DB
     if existing_order:
         existing_order.order_amount = body.order_amount
         existing_order.order_status = "unprocessed"
@@ -138,13 +139,14 @@ def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
             order_amount=body.order_amount,
             order_status="unprocessed",
             store_id=body.store_id,
-            terminal_id=body.terminal_id
+            terminal_id=terminal_code
         )
         db.add(new_order)
         db.commit()
         db.refresh(new_order)
 
     return {"iframe_url": iframe_url, "order_no": order_no}
+
 
 
 
