@@ -8,6 +8,7 @@ class StatusTypeEnum(str, Enum):
     unpaid = "UNPAID"
     
 class CompoundBase(BaseModel):
+    name: str
     compoundnum: str
     plate: str
     date: date

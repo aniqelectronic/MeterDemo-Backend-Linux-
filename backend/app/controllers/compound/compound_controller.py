@@ -7,8 +7,9 @@ import qrcode
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.db.database import get_db
-from app.schema.compound.compound_schema import Compound
+from app.schema.compound.compound_schema import Compound, MultiCompound
 from app.models.compound.compound_model import CompoundCreate, CompoundResponse, StatusTypeEnum
+from app.models.compound.multicompound_model import MultiCompoundBase, MultiCompoundCreate , MultiCompoundResponse
 import qrcode
 
 from app.utils.blob_upload import upload_to_blob
@@ -75,7 +76,7 @@ def get_compound(compound_id: str, db: Session = Depends(get_db)):
   
 
 # ================= COMPOUND RECEIPT QR =================
-@router.get("/receipt/qr/{compoundnum}")
+@router.get("/receipt/qr/single/{compoundnum}")
 def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
     compound = db.query(Compound).filter(Compound.compoundnum == compoundnum).first()
     if not compound:
@@ -231,45 +232,100 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
     return StreamingResponse(buf, media_type="image/png")
     
     
-@router.get("/html/qrdummy/{compoundnum}", response_class=HTMLResponse)
-def qr_page(compoundnum: str):
-    return f"""
-    <html>
-    <body style='text-align:center;margin-top:200px;'>
-        <h1>Compound Payment</h1>
-        <p>Compound No: {compoundnum}</p>
-        <button style='font-size:30px;padding:20px;'
-            onclick="fetch('/compound/pay/{compoundnum}', {{ method:'POST' }})
-            .then(()=>alert('Payment Successful!'));"
-        >
-            PAY
-        </button>
-    </body>
-    </html>
+# ================= GET UNPAID COMPOUNDS BY PLATE =================
+@router.get("/unpaid/{plate}", response_model=list[CompoundResponse])
+def get_unpaid_compounds_by_plate(plate: str, db: Session = Depends(get_db)):
+    compounds = (
+        db.query(Compound)
+        .filter(Compound.plate == plate, Compound.status == StatusTypeEnum.unpaid)
+        .all()
+    )
+    
+    if not compounds:
+        raise HTTPException(status_code=404, detail="No unpaid compounds found for this plate")
+    
+    return compounds
+
+# ================= MULTI COMPOUND PAYMENT =================
+@router.post("/multi/pay", response_model=list[MultiCompoundResponse])
+def pay_multiple_compounds(payload: list[MultiCompoundCreate], db: Session = Depends(get_db)):
+    """
+    Example payload:
+    [
+        {"transaction_bank_id": "BANKTXN123456", "compoundnum": "MBMBCMP2025000123"},
+        {"transaction_bank_id": "BANKTXN123456", "compoundnum": "MBMBCMP2025000456"}
+    ]
     """
 
-# ---------------- Create dummy qr code payment image ----------------
+    transaction_id = payload[0].transaction_bank_id  # all should share same ID
+    saved_entries = []
 
-@router.get("/qrdummy/{compoundnum}")
-def generate_receipt_qr(compoundnum: str, db: Session = Depends(get_db)):
+    for item in payload:
+        # 1️⃣ Verify compound exists
+        compound = db.query(Compound).filter_by(compoundnum=item.compoundnum).first()
+        if not compound:
+            raise HTTPException(status_code=404, detail=f"Compound {item.compoundnum} not found")
 
-    # Use stored URL or generate if missing
-    receipt_url =  f"{BASE_URL}/compound/html/qrdummy/{compoundnum}"
+        # 2️⃣ Mark as paid if not already
+        if compound.status == StatusTypeEnum.paid:
+            continue  # already paid, skip
+        compound.status = StatusTypeEnum.paid
+        db.add(compound)
 
-    # Generate QR code
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
-    )
-    qr.add_data(receipt_url)
-    qr.make(fit=True)
+        # 3️⃣ Record mapping in MultiCompound
+        record = MultiCompound(transaction_bank_id=transaction_id, compoundnum=item.compoundnum)
+        db.add(record)
+        saved_entries.append(record)
 
-    # Convert to image in memory
-    img = qr.make_image(fill_color="black", back_color="white")
-    buf = BytesIO()
-    img.save(buf, format="PNG")
-    buf.seek(0)
+    db.commit()
+    db.refresh(saved_entries[0])  # refresh first one to make sure ORM flush works
 
-    return StreamingResponse(buf, media_type="image/png")
+    return saved_entries
+
+
+
+@router.get("/multi/{transaction_bank_id}", response_model=list[MultiCompoundResponse])
+def get_compounds_by_transaction(transaction_bank_id: str, db: Session = Depends(get_db)):
+    results = db.query(MultiCompound).filter_by(transaction_bank_id=transaction_bank_id).all()
+    if not results:
+        raise HTTPException(status_code=404, detail="No compounds found for this transaction")
+    return results
+
+
+# ================= UPDATE MULTIPLE COMPOUNDS TO PAID =================
+@router.put("/multi/update")
+def update_multiple_compounds_to_paid(data: dict, db: Session = Depends(get_db)):
+    """
+    Example payload:
+    {
+        "compound_numbers": ["MBPPCMP20252", "MBPPCMP20253"]
+    }
+    """
+    compound_numbers = data.get("compound_numbers")
+
+    if not compound_numbers or not isinstance(compound_numbers, list):
+        raise HTTPException(status_code=400, detail="compound_numbers must be a list")
+
+    updated = []
+    skipped = []
+
+    for comp_num in compound_numbers:
+        compound = db.query(Compound).filter_by(compoundnum=comp_num).first()
+        if not compound:
+            skipped.append({"compoundnum": comp_num, "reason": "Not found"})
+            continue
+        if compound.status == StatusTypeEnum.paid:
+            skipped.append({"compoundnum": comp_num, "reason": "Already paid"})
+            continue
+
+        compound.status = StatusTypeEnum.paid
+        db.add(compound)
+        updated.append(comp_num)
+
+    db.commit()
+
+    return {
+        "message": f"{len(updated)} compounds updated to PAID.",
+        "updated_compounds": updated,
+        "skipped": skipped
+    }
