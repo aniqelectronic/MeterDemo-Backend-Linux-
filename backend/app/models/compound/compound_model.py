@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from datetime import date, time
 from enum import Enum
-from typing import Optional
+
 
 class StatusTypeEnum(str, Enum):
     paid = "PAID"
@@ -15,7 +15,7 @@ class CompoundBase(BaseModel):
     time: time
     offense: str
     amount: float
-    status: Optional[StatusTypeEnum] = None
+    status: StatusTypeEnum
 
 class CompoundCreate(CompoundBase):
     pass
