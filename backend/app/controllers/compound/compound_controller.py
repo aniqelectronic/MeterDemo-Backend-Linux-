@@ -66,42 +66,70 @@ def pay_compound(compoundnum: str, db: Session = Depends(get_db)):
 def get_compounds(db: Session = Depends(get_db)):
     return db.query(Compound).all()
   
-# ---------------- GET ONE ----------------
-@router.get("/{compound_id}", response_model=CompoundResponse)
-def get_compound(compound_id: str, db: Session = Depends(get_db)):
-    compound = db.query(Compound).filter(Compound.compoundnum == compound_id).first()
-    if not compound:
-        raise HTTPException(status_code=404, detail="Compound not found")
-    return compound
-  
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session
+from io import BytesIO
+from fpdf import FPDF
+import qrcode
+from app.db.database import get_db
+from app.schema.compound.compound_schema import CompoundCreate
+from app.utils.blob_upload import upload_to_blob
+import html
+
+router = APIRouter()
+
 
 # ================= COMPOUND RECEIPT QR =================
-@router.get("/receipt/qr/single/{compoundnum}")
-def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
-    compound = db.query(Compound).filter(Compound.compoundnum == compoundnum).first()
-    if not compound:
-        raise HTTPException(status_code=404, detail="Compound not found")
+@router.post("/receipt/qr/single")
+def view_compound_receipt(body: CompoundCreate):
 
+    # ================= VALIDATE BODY ==================
+    if not body.compoundnum:
+        raise HTTPException(status_code=400, detail="Compound number required")
+
+    # Escape HTML to avoid breaking formatting
+    compound = body
+    compound_name = html.escape(compound.name or "-")
+    compound_no = html.escape(compound.compoundnum)
+    compound_plate = html.escape(compound.plate or "-")
+    compound_date = html.escape(compound.date or "-")
+    compound_time = html.escape(compound.time or "-")
+    compound_offense = html.escape(compound.offense or "-")
+    compound_status = html.escape(compound.status.value if compound.status else "-")
+    compound_amount = f"{compound.amount:.2f}"
+
+    # ================= PDF GENERATION ==================
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(0, 10, "Compound E-Receipt", ln=True, align="C")
     pdf.ln(5)
+
     pdf.set_font("Arial", '', 12)
-    pdf.cell(0, 8, f"Compound No: {compound.compoundnum}", ln=True)
-    pdf.cell(0, 8, f"Plate: {compound.plate}", ln=True)
-    pdf.cell(0, 8, f"Date: {compound.date}", ln=True)
-    pdf.cell(0, 8, f"Time: {compound.time}", ln=True)
-    pdf.cell(0, 8, f"Offense: {compound.offense}", ln=True)
-    pdf.cell(0, 8, f"Amount: RM {compound.amount:.2f}", ln=True)
+    pdf.cell(0, 8, f"Name: {compound_name}", ln=True)
+    pdf.cell(0, 8, f"Compound No: {compound_no}", ln=True)
+    pdf.cell(0, 8, f"Plate: {compound_plate}", ln=True)
+    pdf.cell(0, 8, f"Date: {compound_date}", ln=True)
+    pdf.cell(0, 8, f"Time: {compound_time}", ln=True)
+    pdf.cell(0, 8, f"Offense: {compound_offense}", ln=True)
+    pdf.cell(0, 8, f"Amount: RM {compound_amount}", ln=True)
+    pdf.cell(0, 8, f"Status: {compound_status}", ln=True)
+
     pdf.ln(10)
     pdf.cell(0, 10, "Thank you for your payment!", ln=True, align="C")
 
     pdf_bytes = pdf.output(dest="S").encode("latin1")
-    pdf_filename = f"compound_{compound.compoundnum}.pdf"
-    pdf_url = upload_to_blob(pdf_filename, pdf_bytes, content_type="application/pdf")
-    
-    html = f"""
+    pdf_filename = f"compound_{compound_no}.pdf"
+
+    pdf_url = upload_to_blob(
+        pdf_filename,
+        pdf_bytes,
+        content_type="application/pdf"
+    )
+
+    # ================= HTML RECEIPT ==================
+    html_content = f"""
     <html>
     <head>
         <title>Compound Receipt</title>
@@ -115,18 +143,17 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
                 display: flex;
                 justify-content: center;
             }}
-    
+
             .receipt {{
-                background: #ffffff;
+                background: white;
                 border-radius: 16px;
                 padding: 30px 35px;
                 width: 100%;
                 max-width: 650px;
                 box-shadow: 0 6px 18px rgba(0,0,0,0.08);
             }}
-    
+
             .header {{
-                width: 100%;
                 background: #2F80ED;
                 color: white;
                 padding: 20px;
@@ -134,26 +161,25 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
                 text-align: center;
                 font-size: 24px;
                 font-weight: bold;
-                letter-spacing: .5px;
             }}
-    
+
             .info-section {{
                 margin-top: 25px;
                 font-size: 17px;
                 color: #333;
             }}
-    
+
             .info-row {{
                 display: flex;
                 justify-content: space-between;
                 padding: 10px 0;
                 border-bottom: 1px solid #eee;
             }}
-    
+
             .info-label {{
                 font-weight: 600;
             }}
-    
+
             .amount-box {{
                 margin-top: 25px;
                 padding: 18px;
@@ -165,7 +191,7 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
                 color: #2F80ED;
                 text-align: center;
             }}
-    
+
             .thankyou {{
                 margin-top: 30px;
                 font-size: 19px;
@@ -173,12 +199,12 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
                 color: #27ae60;
                 text-align: center;
             }}
-    
+
             .download-btn {{
                 margin-top: 35px;
                 text-align: center;
             }}
-    
+
             .download-btn a {{
                 background: #2F80ED;
                 padding: 12px 30px;
@@ -186,91 +212,63 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
                 color: white;
                 border-radius: 10px;
                 text-decoration: none;
-                transition: .2s;
             }}
-    
-            .download-btn a:hover {{
-                background: #1c62bf;
-            }}
-    
+
             .footer {{
                 margin-top: 25px;
                 text-align: center;
                 font-size: 14px;
                 color: gray;
             }}
-    
-            @media print {{
-                body {{
-                    background: white;
-                }}
-                .download-btn {{ display: none; }}
-                .receipt {{
-                    box-shadow: none;
-                    padding: 20px;
-                }}
-            }}
         </style>
     </head>
     <body>
-    
+
     <div class="receipt">
         <div class="header">Compound Receipt</div>
-    
+
         <div class="info-section">
-            <div class="info-row">
-                <span class="info-label">Compound No:</span>
-                <span>{compound.compoundnum}</span>
-            </div>
-    
-            <div class="info-row">
-                <span class="info-label">Plate No:</span>
-                <span>{compound.plate}</span>
-            </div>
-    
-            <div class="info-row">
-                <span class="info-label">Date:</span>
-                <span>{compound.date}</span>
-            </div>
-    
-            <div class="info-row">
-                <span class="info-label">Time:</span>
-                <span>{compound.time}</span>
-            </div>
-    
-            <div class="info-row">
-                <span class="info-label">Offense:</span>
-                <span>{compound.offense}</span>
-            </div>
+            <div class="info-row"><span class="info-label">Name:</span> <span>{compound_name}</span></div>
+            <div class="info-row"><span class="info-label">Compound No:</span> <span>{compound_no}</span></div>
+            <div class="info-row"><span class="info-label">Plate No:</span> <span>{compound_plate}</span></div>
+            <div class="info-row"><span class="info-label">Date:</span> <span>{compound_date}</span></div>
+            <div class="info-row"><span class="info-label">Time:</span> <span>{compound_time}</span></div>
+            <div class="info-row"><span class="info-label">Offense:</span> <span>{compound_offense}</span></div>
+            <div class="info-row"><span class="info-label">Status:</span> <span>{compound_status}</span></div>
         </div>
-    
-        <div class="amount-box">
-            Amount: RM {compound.amount:.2f}
-        </div>
-    
+
+        <div class="amount-box">Amount: RM {compound_amount}</div>
+
         <div class="thankyou">Thank you for your payment!</div>
-    
+
         <div class="download-btn">
             <a href="{pdf_url}" target="_blank">Download PDF</a>
         </div>
-    
+
         <div class="footer">Generated by Parking System</div>
     </div>
-    
+
     </body>
     </html>
     """
 
-    html_bytes = html.encode("utf-8")
-    filename = f"compound_{compound.compoundnum}.html"
-    
-    # ✅ Upload to Azure Blob
-    blob_url = upload_to_blob(filename, html_bytes, content_type="text/html")
-    
-        # Generate QR for Blob URL
-    receipt_url = blob_url
-    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
-    qr.add_data(receipt_url)
+    html_bytes = html_content.encode("utf-8")
+    html_filename = f"compound_{compound_no}.html"
+
+    html_url = upload_to_blob(
+        html_filename,
+        html_bytes,
+        content_type="text/html"
+    )
+
+    # ================= QR GENERATION ==================
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4
+    )
+    qr.add_data(html_url)
     qr.make(fit=True)
 
     img = qr.make_image(fill_color="black", back_color="white")
@@ -279,6 +277,8 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
     buf.seek(0)
 
     return StreamingResponse(buf, media_type="image/png")
+
+
     
     
 # ================= GET UNPAID COMPOUNDS BY PLATE =================
