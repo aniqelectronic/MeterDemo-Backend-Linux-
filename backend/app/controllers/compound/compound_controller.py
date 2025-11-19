@@ -103,115 +103,164 @@ def view_compound_receipt(compoundnum: str, db: Session = Depends(get_db)):
     
     html = f"""
     <html>
-        <head>
-            <title>Compound E-Receipt</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
+    <head>
+        <title>Compound Receipt</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body {{
+                font-family: 'Segoe UI', Tahoma, sans-serif;
+                background: #eceff1;
+                margin: 0;
+                padding: 25px;
+                display: flex;
+                justify-content: center;
+            }}
+    
+            .receipt {{
+                background: #ffffff;
+                border-radius: 16px;
+                padding: 30px 35px;
+                width: 100%;
+                max-width: 650px;
+                box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+            }}
+    
+            .header {{
+                width: 100%;
+                background: #2F80ED;
+                color: white;
+                padding: 20px;
+                border-radius: 12px;
+                text-align: center;
+                font-size: 24px;
+                font-weight: bold;
+                letter-spacing: .5px;
+            }}
+    
+            .info-section {{
+                margin-top: 25px;
+                font-size: 17px;
+                color: #333;
+            }}
+    
+            .info-row {{
+                display: flex;
+                justify-content: space-between;
+                padding: 10px 0;
+                border-bottom: 1px solid #eee;
+            }}
+    
+            .info-label {{
+                font-weight: 600;
+            }}
+    
+            .amount-box {{
+                margin-top: 25px;
+                padding: 18px;
+                background: #f4f7ff;
+                border-left: 6px solid #2F80ED;
+                border-radius: 10px;
+                font-size: 20px;
+                font-weight: bold;
+                color: #2F80ED;
+                text-align: center;
+            }}
+    
+            .thankyou {{
+                margin-top: 30px;
+                font-size: 19px;
+                font-weight: bold;
+                color: #27ae60;
+                text-align: center;
+            }}
+    
+            .download-btn {{
+                margin-top: 35px;
+                text-align: center;
+            }}
+    
+            .download-btn a {{
+                background: #2F80ED;
+                padding: 12px 30px;
+                font-size: 17px;
+                color: white;
+                border-radius: 10px;
+                text-decoration: none;
+                transition: .2s;
+            }}
+    
+            .download-btn a:hover {{
+                background: #1c62bf;
+            }}
+    
+            .footer {{
+                margin-top: 25px;
+                text-align: center;
+                font-size: 14px;
+                color: gray;
+            }}
+    
+            @media print {{
                 body {{
-                    font-family: Arial, sans-serif;
-                    margin: 0;
-                    padding: 0;
-                    background: #f5f5f5;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    min-height: 100vh;
-                }}
-                .receipt {{
                     background: white;
-                    padding: 30px 40px;
-                    border-radius: 15px;
-                    box-shadow: 0 0 15px rgba(0,0,0,0.1);
-                    width: 90%;
-                    max-width: 600px;
-                    font-size: 18px;
-                    line-height: 1.6;
                 }}
-                h2 {{
-                    color: #111;
-                    text-align: center;
-                    font-size: 26px;
-                    margin-bottom: 25px;
-                    letter-spacing: 0.5px;
+                .download-btn {{ display: none; }}
+                .receipt {{
+                    box-shadow: none;
+                    padding: 20px;
                 }}
-                p {{
-                    margin: 8px 0;
-                    font-size: 17px;
-                }}
-                .thankyou {{
-                    margin-top: 25px;
-                    font-size: 20px;
-                    font-weight: bold;
-                    text-align: center;
-                    color: #2a7a2a;
-                }}
-                .footer {{
-                    margin-top: 25px;
-                    font-size: 14px;
-                    color: gray;
-                    text-align: center;
-                }}
-                .download-btn {{
-                    display: block;
-                    text-align: center;
-                    margin-top: 25px;
-                }}
-                .download-btn a {{
-                    text-decoration: none;
-                    background-color: #4CAF50;
-                    color: white;
-                    padding: 10px 25px;
-                    font-size: 16px;
-                    border-radius: 8px;
-                    transition: 0.2s;
-                }}
-                .download-btn a:hover {{
-                    background-color: #45a049;
-                }}
-                @media print {{
-                    body {{
-                        background: white;
-                    }}
-                    .receipt {{
-                        box-shadow: none;
-                        border: none;
-                        width: 100%;
-                        font-size: 16px;
-                        padding: 20px;
-                    }}
-                    .download-btn {{ display: none; }}
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="receipt">
-                <h2>Compound E-Receipt</h2>
-                <p><b>Compound No:</b> {compound.compoundnum}</p>
-                <p><b>Plate:</b> {compound.plate}</p>
-                <p><b>Date:</b> {compound.date}</p>
-                <p><b>Time:</b> {compound.time}</p>
-                <p><b>Offense:</b> {compound.offense}</p>
-                <p><b>Amount:</b> 
-                    <span style="font-size:20px; font-weight:bold; color:#000;">
-                        RM {compound.amount:.2f}
-                    </span>
-                </p>
+            }}
+        </style>
+    </head>
+    <body>
     
-                <div class="thankyou">Thank you for your payment</div>
+    <div class="receipt">
+        <div class="header">Compound Receipt</div>
     
-                <div class="download-btn">
-                    <a href="{pdf_url}" target="_blank">
-                        Download PDF
-                    </a>
-                </div>
-    
-                <div class="footer">Generated by Parking System</div>
+        <div class="info-section">
+            <div class="info-row">
+                <span class="info-label">Compound No:</span>
+                <span>{compound.compoundnum}</span>
             </div>
-        </body>
+    
+            <div class="info-row">
+                <span class="info-label">Plate No:</span>
+                <span>{compound.plate}</span>
+            </div>
+    
+            <div class="info-row">
+                <span class="info-label">Date:</span>
+                <span>{compound.date}</span>
+            </div>
+    
+            <div class="info-row">
+                <span class="info-label">Time:</span>
+                <span>{compound.time}</span>
+            </div>
+    
+            <div class="info-row">
+                <span class="info-label">Offense:</span>
+                <span>{compound.offense}</span>
+            </div>
+        </div>
+    
+        <div class="amount-box">
+            Amount: RM {compound.amount:.2f}
+        </div>
+    
+        <div class="thankyou">Thank you for your payment!</div>
+    
+        <div class="download-btn">
+            <a href="{pdf_url}" target="_blank">Download PDF</a>
+        </div>
+    
+        <div class="footer">Generated by Parking System</div>
+    </div>
+    
+    </body>
     </html>
     """
-    
-    
+
     html_bytes = html.encode("utf-8")
     filename = f"compound_{compound.compoundnum}.html"
     
@@ -363,106 +412,118 @@ def generate_multi_compound_receipt(payload: dict):
     # --- Build HTML receipt ---
     html = f"""
     <html>
-        <head>
-            <title>Multiple Compound E-Receipt</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-                body {{
-                    font-family: Arial, sans-serif;
-                    background: #f8f9fa;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    min-height: 100vh;
-                }}
-                .receipt {{
-                    background: #fff;
-                    padding: 30px;
-                    border-radius: 15px;
-                    box-shadow: 0 0 15px rgba(0,0,0,0.1);
-                    width: 90%;
-                    max-width: 600px;
-                }}
-                h2 {{
-                    text-align: center;
-                    font-size: 24px;
-                    color: #333;
-                    margin-bottom: 20px;
-                }}
-                table {{
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin-bottom: 20px;
-                }}
-                th, td {{
-                    border: 1px solid #ddd;
-                    padding: 10px;
-                    text-align: left;
-                    font-size: 16px;
-                }}
-                th {{
-                    background-color: #f2f2f2;
-                    text-align: center;
-                }}
-                td {{
-                    text-align: center;
-                }}
-                .total {{
-                    text-align: right;
-                    font-size: 18px;
-                    font-weight: bold;
-                    margin-top: 10px;
-                }}
-                .thankyou {{
-                    text-align: center;
-                    color: #2a7a2a;
-                    font-size: 20px;
-                    margin-top: 25px;
-                }}
-                .footer {{
-                    text-align: center;
-                    font-size: 14px;
-                    color: gray;
-                    margin-top: 25px;
-                }}
-                .download-btn {{
-                    text-align: center;
-                    margin-top: 25px;
-                }}
-                .download-btn a {{
-                    text-decoration: none;
-                    background-color: #007bff;
-                    color: white;
-                    padding: 10px 25px;
-                    border-radius: 8px;
-                    transition: 0.2s;
-                }}
-                .download-btn a:hover {{
-                    background-color: #0056b3;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="receipt">
-                <h2>Multiple Compound E-Receipt</h2>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Compound No.</th>
-                            <th>Amount (RM)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {rows_html}
-                    </tbody>
-                </table>
-                <div class="total">Total Amount: RM {float(total_amount):.2f}</div>
-                <div class="thankyou">Thank you for your payment!</div>
-                <div class="footer">Generated by Parking System</div>
-            </div>
-        </body>
+    <head>
+        <title>Multi-Compound Receipt</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body {{
+                font-family: 'Segoe UI', Tahoma, sans-serif;
+                background: #e8ebef;
+                padding: 25px;
+                display: flex;
+                justify-content: center;
+            }}
+    
+            .receipt {{
+                background: white;
+                padding: 35px;
+                width: 100%;
+                max-width: 750px;
+                border-radius: 16px;
+                box-shadow: 0px 6px 20px rgba(0,0,0,0.08);
+            }}
+    
+            .header {{
+                background: #2F80ED;
+                color: white;
+                padding: 18px;
+                font-size: 24px;
+                text-align: center;
+                border-radius: 12px;
+            }}
+    
+            table {{
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 25px;
+            }}
+    
+            th {{
+                background: #f5f8ff;
+                padding: 12px;
+                border-bottom: 2px solid #e0e0e0;
+                font-size: 16px;
+                font-weight: bold;
+            }}
+    
+            td {{
+                padding: 12px;
+                text-align: center;
+                border-bottom: 1px solid #eee;
+                font-size: 16px;
+            }}
+    
+            .total {{
+                margin-top: 20px;
+                background: #f4f7ff;
+                padding: 15px;
+                font-size: 20px;
+                font-weight: bold;
+                border-left: 6px solid #2F80ED;
+                border-radius: 10px;
+                text-align: right;
+            }}
+    
+            .thankyou {{
+                margin-top: 30px;
+                color: #27ae60;
+                text-align: center;
+                font-size: 20px;
+                font-weight: bold;
+            }}
+    
+            .footer {{
+                margin-top: 25px;
+                text-align: center;
+                font-size: 14px;
+                color: gray;
+            }}
+    
+            @media print {{
+                body {{ background: white; }}
+                .receipt {{ box-shadow: none; padding: 20px; }}
+            }}
+        </style>
+    </head>
+    <body>
+    
+    <div class="receipt">
+    
+        <div class="header">Multiple Compound Receipt</div>
+    
+        <table>
+            <thead>
+                <tr>
+                    <th>Compound Number</th>
+                    <th>Amount (RM)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows_html}
+            </tbody>
+        </table>
+    
+        <div class="total">Total: RM {float(total_amount):.2f}</div>
+    
+        <div class="thankyou">Thank you for your payment!</div>
+        <div class="footer">Generated by Parking System</div>
+    
+    </div>
+    
+    </body>
     </html>
     """
+
 
     # --- Upload HTML to Azure Blob ---
     html_bytes = html.encode("utf-8")
