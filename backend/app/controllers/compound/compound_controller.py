@@ -80,8 +80,8 @@ def view_compound_receipt(body: CompoundCreate):
     compound_name = html.escape(compound.name or "-")
     compound_no = html.escape(compound.compoundnum)
     compound_plate = html.escape(compound.plate or "-")
-    compound_date = html.escape(compound.date or "-")
-    compound_time = html.escape(compound.time or "-")
+    compound_date = compound.date.strftime("%Y-%m-%d")
+    compound_time = compound.time.strftime("%H:%M")
     compound_offense = html.escape(compound.offense or "-")
     compound_status = html.escape(compound.status.value if compound.status else "-")
     compound_amount = f"{compound.amount:.2f}"
