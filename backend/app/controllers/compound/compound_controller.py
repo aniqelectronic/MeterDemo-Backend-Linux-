@@ -11,7 +11,7 @@ from app.schema.compound.compound_schema import Compound, MultiCompound
 from app.models.compound.compound_model import CompoundCreate, CompoundResponse, StatusTypeEnum
 from app.models.compound.multicompound_model import MultiCompoundBase, MultiCompoundCreate , MultiCompoundResponse
 import qrcode
-
+import html
 from app.utils.blob_upload import upload_to_blob
 
 # ----------------- CONFIG -----------------
@@ -65,19 +65,6 @@ def pay_compound(compoundnum: str, db: Session = Depends(get_db)):
 @router.get("/", response_model=list[CompoundResponse])
 def get_compounds(db: Session = Depends(get_db)):
     return db.query(Compound).all()
-  
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
-from io import BytesIO
-from fpdf import FPDF
-import qrcode
-from app.db.database import get_db
-from app.schema.compound.compound_schema import CompoundCreate
-from app.utils.blob_upload import upload_to_blob
-import html
-
-router = APIRouter()
 
 
 # ================= COMPOUND RECEIPT QR =================
