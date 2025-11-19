@@ -86,29 +86,39 @@ def add_new_parking(db: Session, plate: str, time_used: float, terminal: str, tr
     db.refresh(transaction)
     return new_parking
 
-def extend_parking(db: Session, plate: str, hours: float, terminal: str, transaction_type: str ):
+def extend_parking(db: Session, plate: str, hours: float, terminal: str, transaction_type: str):
     active = check_active_parking(db, plate)
-    if not active:
-        raise HTTPException(status_code=404, detail="No active paid parking to extend")
 
-    # Maintain timein, update timeout and time_used
+    # 🔥 OPTION C: If NOT active = expired → treat as NEW PARKING
+    if not active:
+        return add_new_parking(
+            db,
+            plate,
+            hours,
+            terminal,
+            transaction_type
+        )
+
+    # If still active → extend normally
     active.time_used += hours
     active.timeout += timedelta(hours=hours)
     active.amount = calculate_amount(active.time_used)
-    active.terminal = terminal 
+    active.terminal = terminal
+
     db.commit()
     db.refresh(active)
 
-   
+    # Log extension transaction
     last_tx = db.query(TransactionParking).order_by(TransactionParking.id.desc()).first()
     next_ticket = f"P-{(last_tx.id + 1) if last_tx else 1:04d}"
+
     transaction = TransactionParking(
         ticket_id=next_ticket,
         terminal=terminal,
         plate=plate,
         hours=hours,
         amount=calculate_amount(hours),
-        transaction_type= transaction_type,
+        transaction_type=transaction_type,
         Ticket_Overview=TicketOverviewEnum.extend
     )
     db.add(transaction)
