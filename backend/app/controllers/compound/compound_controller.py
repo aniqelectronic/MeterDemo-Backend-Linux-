@@ -415,6 +415,7 @@ def generate_multi_compound_receipt(payload: dict):
     <head>
         <title>Multi-Compound Receipt</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
+    
         <style>
             body {{
                 font-family: 'Segoe UI', Tahoma, sans-serif;
@@ -431,21 +432,23 @@ def generate_multi_compound_receipt(payload: dict):
                 max-width: 750px;
                 border-radius: 16px;
                 box-shadow: 0px 6px 20px rgba(0,0,0,0.08);
-            }}
     
-            .header {{
-                background: #2F80ED;
-                color: white;
-                padding: 18px;
-                font-size: 24px;
-                text-align: center;
-                border-radius: 12px;
+                /* 🔥 FIX 1: Allow content to expand */
+                height: auto;
             }}
     
             table {{
                 width: 100%;
                 border-collapse: collapse;
                 margin-top: 25px;
+    
+                /* 🔥 FIX 2: Allow table to break across pages */
+                page-break-inside: auto;
+            }}
+    
+            tr {{
+                page-break-inside: avoid;
+                page-break-after: auto;
             }}
     
             th {{
@@ -491,7 +494,20 @@ def generate_multi_compound_receipt(payload: dict):
     
             @media print {{
                 body {{ background: white; }}
-                .receipt {{ box-shadow: none; padding: 20px; }}
+                .receipt {{ 
+                    box-shadow: none; 
+                    padding: 20px; 
+                    height: auto; /* 🔥 FIX 3: Ensure full length in print */
+                }}
+    
+                table {{
+                    page-break-inside: auto;
+                }}
+    
+                tr {{
+                    page-break-inside: avoid;
+                    page-break-after: auto;
+                }}
             }}
         </style>
     </head>
