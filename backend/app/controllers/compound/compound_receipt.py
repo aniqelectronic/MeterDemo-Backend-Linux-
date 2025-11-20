@@ -49,7 +49,7 @@ def generate_single_compound_pdf(compound):
     logo_bottom = 10 + 50  # y + height
 
     # ================= TITLE =================
-    pdf.set_xy(10, logo_bottom + 5)
+    pdf.set_xy(10, logo_bottom + 10)
     pdf.set_font("Arial", "B", 20)
     pdf.cell(190, 12, "COMPOUND E-RECEIPT", align="C")
 
@@ -105,7 +105,7 @@ def generate_single_compound_pdf(compound):
     pdf.set_fill_color(230, 240, 255)
     pdf.rect(box_x, amount_y, box_w, amount_h, style="F")
 
-    pdf.set_xy(box_x, amount_y + 3)
+    pdf.set_xy(box_x, amount_y + 2)
     pdf.set_font("Arial", "B", 16)
     pdf.set_text_color(0, 80, 180)
     pdf.cell(box_w, 10, f"Amount: RM {compound_amount}", align="C")
@@ -113,11 +113,11 @@ def generate_single_compound_pdf(compound):
     # ================= THANK YOU =================
     pdf.set_font("Arial", "I", 12)
     pdf.set_text_color(0, 0, 0)
-    pdf.set_xy(10, amount_y + amount_h + 10)
+    pdf.set_xy(10, amount_y + amount_h + 8)
     pdf.cell(190, 10, "Thank you for your payment!", align="C")
 
     # ================= FOOTER (always page 1 bottom) =================
-    pdf.set_xy(10, 280)  # absolute position — no page 2 ever
+    pdf.set_xy(10, amount_y + amount_h + 15)  # absolute position — no page 2 ever
     pdf.set_font("Arial", "I", 10)
     pdf.set_text_color(150, 150, 150)
     pdf.cell(190, 10, "2025 City Car Park System . All Rights Reserved", align="C")
