@@ -10,29 +10,6 @@ from reportlab.lib import colors
 import os
 
 # =====================================================
-# SANITIZER for unsupported characters (FPDF Latin-1)
-# =====================================================
-
-def safe_text(text: str):
-    if not text:
-        return "-"
-    replacements = {
-        "©": "(c)",
-        "•": "-",
-        "…": "...",
-        "–": "-",
-        "—": "-",
-        "’": "'",
-        "“": '"',
-        "”": '"',
-        "°": "deg",
-        "₹": "RM",
-    }
-    for bad, good in replacements.items():
-        text = text.replace(bad, good)
-    return text
-
-# =====================================================
 # LOGO HANDLING
 # =====================================================
 
@@ -113,7 +90,7 @@ def generate_single_compound_pdf(compound):
     pdf.cell(0, 10, "Thank you for your payment!", ln=True, align="C")
 
     # ========== FOOTER ==========
-    footer_text = safe_text("© 2025 City Car Park System • All Rights Reserved")
+    footer_text = safe_text("2025 City Car Park System . All Rights Reserved")
     pdf.set_y(-15)
     pdf.set_font("Arial", "", 9)
     pdf.set_text_color(150, 150, 150)
@@ -196,7 +173,7 @@ def generate_multi_compound_pdf(compounds, total_amount):
     # ===== FOOTER =====
     pdf.setFont("Helvetica", 9)
     pdf.setFillColor(colors.grey)
-    pdf.drawCentredString(width / 2, 30, "© 2025 City Car Park System • All Rights Reserved")
+    pdf.drawCentredString(width / 2, 30, " 2025 City Car Park System . All Rights Reserved")
 
     pdf.save()
     buffer.seek(0)
