@@ -43,97 +43,90 @@ def generate_single_compound_pdf(compound):
     pdf = FPDF()
     pdf.add_page()
 
-    # ========== LOGO ==========
-    logo_height = 0
+    # ================= LOGO =================
     if os.path.exists(LOGO_PATH):
-        # draw logo at top (absolute position)
         pdf.image(LOGO_PATH, x=70, y=10, w=70)
-        logo_height = 50  # approx height used for spacing
+    logo_bottom = 10 + 50  # y + height
 
-    # start content below logo (absolute)
-    cursor_y = 10 + logo_height + 6
-    pdf.set_y(cursor_y)
-
-    # ========== TITLE ==========
+    # ================= TITLE =================
+    pdf.set_xy(10, logo_bottom + 5)
     pdf.set_font("Arial", "B", 20)
-    pdf.set_text_color(30, 30, 30)
-    pdf.cell(0, 12, "COMPOUND E-RECEIPT", ln=True, align="C")
+    pdf.cell(190, 12, "COMPOUND E-RECEIPT", align="C")
 
+    # Divider line
     pdf.set_draw_color(200, 200, 200)
-    # draw divider line right below title
-    line_y = pdf.get_y() + 3
-    pdf.line(20, line_y, 190, line_y)
+    pdf.line(20, logo_bottom + 22, 190, logo_bottom + 22)
 
-    # Move cursor a little after the line
-    pdf.set_y(line_y + 8)
-
-    # ========== DETAILS BOX (NO ROUNDED CORNER) ==========
+    # ================= DETAILS BOX =================
     box_x = 15
-    box_y = pdf.get_y()
+    box_y = logo_bottom + 30
     box_w = 180
-    box_h = 110
-    pad = 8  # inner padding
+    box_h = 115
+    pad = 8
+    inner_w = box_w - (pad * 2)
 
-    # background box
+    # Box background
     pdf.set_fill_color(245, 247, 255)
-    pdf.set_draw_color(245, 247, 255)
     pdf.rect(box_x, box_y, box_w, box_h, style="F")
 
-    # start writing inside the box using absolute coordinates + padding
-    content_x = box_x + pad
-    content_y = box_y + pad
+    # ----- Write inside box -----
+    y = box_y + pad
 
-    pdf.set_xy(content_x, content_y)
+    pdf.set_xy(box_x + pad, y)
     pdf.set_font("Arial", "B", 14)
-    pdf.cell(box_w - 2*pad, 8, "Receipt Details", ln=True)
+    pdf.cell(inner_w, 8, "Receipt Details", ln=True)
 
-    # small gap after header inside the box
-    content_y = pdf.get_y() + 2
-    pdf.set_xy(content_x, content_y)
     pdf.set_font("Arial", "", 12)
+    y += 12
 
-    # Each line uses cell with width restricted to box inner width
-    inner_w = box_w - 2*pad
+    # Now place each line manually inside the box
+    lines = [
+        f"Name        : {compound_name}",
+        f"Compound No : {compound_no}",
+        f"Plate No    : {compound_plate}",
+        f"Date        : {compound_date}",
+        f"Time        : {compound_time}",
+    ]
 
-    pdf.cell(inner_w, 8, f"Name: {compound_name}", ln=True)
-    pdf.cell(inner_w, 8, f"Compound No: {compound_no}", ln=True)
-    pdf.cell(inner_w, 8, f"Plate No: {compound_plate}", ln=True)
-    pdf.cell(inner_w, 8, f"Date: {compound_date}", ln=True)
-    pdf.cell(inner_w, 8, f"Time: {compound_time}", ln=True)
+    for line in lines:
+        pdf.set_xy(box_x + pad, y)
+        pdf.cell(inner_w, 7, line, ln=True)
+        y += 8
 
-    # Offense may be long — use multi_cell to wrap inside the box
-    pdf.set_x(content_x)
-    pdf.multi_cell(inner_w, 7, f"Offense: {compound_offense}")
+    # ---- Offense (multi-line inside box safely) ----
+    pdf.set_xy(box_x + pad, y)
+    pdf.multi_cell(inner_w, 7, f"Offense     : {compound_offense}")
+    y = pdf.get_y()
 
-    # ========== AMOUNT BOX ==========
-    amount_box_y = box_y + box_h + 12
-    amount_box_h = 16
+    # ================= AMOUNT BOX =================
+    amount_y = box_y + box_h + 10
+    amount_h = 16
+
     pdf.set_fill_color(230, 240, 255)
-    pdf.set_draw_color(230, 240, 255)
-    pdf.rect(box_x, amount_box_y, box_w, amount_box_h, style="F")
+    pdf.rect(box_x, amount_y, box_w, amount_h, style="F")
 
-    pdf.set_xy(box_x, amount_box_y + 3)
+    pdf.set_xy(box_x, amount_y + 3)
     pdf.set_font("Arial", "B", 16)
     pdf.set_text_color(0, 80, 180)
-    pdf.cell(box_w, amount_box_h - 4, f"Amount: RM {compound_amount}", align="C")
+    pdf.cell(box_w, 10, f"Amount: RM {compound_amount}", align="C")
 
-    # ========== THANK YOU / FOOTER ==========
-    pdf.set_text_color(0, 0, 0)
+    # ================= THANK YOU =================
     pdf.set_font("Arial", "I", 12)
-    # place thank you below amount box
-    pdf.set_y(amount_box_y + amount_box_h + 12)
-    pdf.cell(0, 10, "Thank you for your payment!", ln=True, align="C")
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_xy(10, amount_y + amount_h + 10)
+    pdf.cell(190, 10, "Thank you for your payment!", align="C")
 
-    # footer at bottom
-    pdf.set_y(-15)
+    # ================= FOOTER (always page 1 bottom) =================
+    pdf.set_xy(10, 280)  # absolute position — no page 2 ever
     pdf.set_font("Arial", "I", 10)
     pdf.set_text_color(150, 150, 150)
-    pdf.cell(0, 10, "2025 City Car Park System . All Rights Reserved", ln=True, align="C")
+    pdf.cell(190, 10, "2025 City Car Park System . All Rights Reserved", align="C")
 
-    # Output (latin1 as you used before)
+    # Return bytes
     pdf_bytes = pdf.output(dest="S").encode("latin1")
     filename = f"compound_{compound_no}.pdf"
     return upload_to_blob(filename, pdf_bytes, "application/pdf")
+
 
 
 
