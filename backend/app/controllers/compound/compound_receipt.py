@@ -43,9 +43,14 @@ def generate_single_compound_pdf(compound):
     pdf.add_page()
 
     # ========== LOGO ==========
+    logo_height = 0
     if os.path.exists(LOGO_PATH):
         pdf.image(LOGO_PATH, x=70, y=10, w=70)
-        pdf.ln(80)
+        logo_height = 50  # actual height of logo (approx)
+
+    # Move cursor BELOW logo
+    start_y = 10 + logo_height + 20
+    pdf.set_y(start_y)
 
     # ========== TITLE ==========
     pdf.set_font("Arial", "B", 20)
@@ -53,34 +58,38 @@ def generate_single_compound_pdf(compound):
     pdf.cell(0, 12, "COMPOUND E-RECEIPT", ln=True, align="C")
 
     pdf.set_draw_color(200, 200, 200)
-    pdf.line(20, 55, 190, 55)
+    pdf.line(20, pdf.get_y() + 3, 190, pdf.get_y() + 3)
     pdf.ln(10)
 
-    # ========== DETAILS BOX (NO ROUNDED CORNER) ==========
+    # ========== DETAILS BOX ==========
+    box_y = pdf.get_y()
+    box_height = 110
+
     pdf.set_fill_color(245, 247, 255)
     pdf.set_draw_color(245, 247, 255)
-    pdf.rect(15, 60, 180, 110, style="F")
+    pdf.rect(15, box_y, 180, box_height, style="F")
 
-    pdf.set_xy(20, 65)
+    # Content inside box
+    pdf.set_xy(20, box_y + 5)
     pdf.set_font("Arial", "B", 14)
     pdf.cell(0, 10, "Receipt Details", ln=True)
 
-    pdf.ln(3)
     pdf.set_font("Arial", "", 12)
-    pdf.cell(0, 10, f"Name: {compound_name}", ln=True)
-    pdf.cell(0, 10, f"Compound No: {compound_no}", ln=True)
-    pdf.cell(0, 10, f"Plate No: {compound_plate}", ln=True)
-    pdf.cell(0, 10, f"Date: {compound_date}", ln=True)
-    pdf.cell(0, 10, f"Time: {compound_time}", ln=True)
-    pdf.multi_cell(0, 10, f"Offense: {compound_offense}")
+    pdf.ln(2)
+    pdf.cell(0, 8, f"Name: {compound_name}", ln=True)
+    pdf.cell(0, 8, f"Compound No: {compound_no}", ln=True)
+    pdf.cell(0, 8, f"Plate No: {compound_plate}", ln=True)
+    pdf.cell(0, 8, f"Date: {compound_date}", ln=True)
+    pdf.cell(0, 8, f"Time: {compound_time}", ln=True)
+    pdf.multi_cell(0, 8, f"Offense: {compound_offense}")
 
     # ========== AMOUNT BOX ==========
-    pdf.ln(4)
+    amount_y = box_y + box_height + 12
     pdf.set_fill_color(230, 240, 255)
     pdf.set_draw_color(230, 240, 255)
-    pdf.rect(15, 175, 180, 15, style="F")
+    pdf.rect(15, amount_y, 180, 15, style="F")
 
-    pdf.set_xy(15, 175)
+    pdf.set_xy(15, amount_y)
     pdf.set_font("Arial", "B", 16)
     pdf.set_text_color(0, 80, 180)
     pdf.cell(180, 15, f"Amount: RM {compound_amount}", align="C")
@@ -93,8 +102,8 @@ def generate_single_compound_pdf(compound):
 
     pdf_bytes = pdf.output(dest="S").encode("latin1")
     filename = f"compound_{compound_no}.pdf"
-
     return upload_to_blob(filename, pdf_bytes, "application/pdf")
+
 
 
 # =====================================================
