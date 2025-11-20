@@ -171,7 +171,7 @@ def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
                     </a>
                 </div>
     
-                <div class="footer">© 2025 City Car Park System • All Rights Reserved</div>
+                <div class="footer">&copy; 2025 City Car Park System &bull; All Rights Reserved</div>
             </div>
         </body>
     </html>
@@ -402,10 +402,7 @@ def get_latest_qr(db: Session = Depends(get_db)):
             <div class="download-btn">
               <a href="{pdf_url}" target="_blank">Download PDF</a>
             </div>
-  
-            <div class="footer">
-              <p>© 2025 City Car Park System • All Rights Reserved</p>
-            </div>
+             <div class="footer">&copy; 2025 City Car Park System &bull; All Rights Reserved</div>
           </div>
         </body>
       </html>
