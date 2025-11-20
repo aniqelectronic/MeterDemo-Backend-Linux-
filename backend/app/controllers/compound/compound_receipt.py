@@ -45,7 +45,7 @@ def generate_single_compound_pdf(compound):
     # ========== LOGO ==========
     if os.path.exists(LOGO_PATH):
         pdf.image(LOGO_PATH, x=70, y=10, w=70)
-        pdf.ln(60)
+        pdf.ln(80)
 
     # ========== TITLE ==========
     pdf.set_font("Arial", "B", 20)
@@ -67,12 +67,12 @@ def generate_single_compound_pdf(compound):
 
     pdf.ln(3)
     pdf.set_font("Arial", "", 12)
-    pdf.cell(0, 8, f"Name: {compound_name}", ln=True)
-    pdf.cell(0, 8, f"Compound No: {compound_no}", ln=True)
-    pdf.cell(0, 8, f"Plate No: {compound_plate}", ln=True)
-    pdf.cell(0, 8, f"Date: {compound_date}", ln=True)
-    pdf.cell(0, 8, f"Time: {compound_time}", ln=True)
-    pdf.multi_cell(0, 8, f"Offense: {compound_offense}")
+    pdf.cell(0, 10, f"Name: {compound_name}", ln=True)
+    pdf.cell(0, 10, f"Compound No: {compound_no}", ln=True)
+    pdf.cell(0, 10, f"Plate No: {compound_plate}", ln=True)
+    pdf.cell(0, 10, f"Date: {compound_date}", ln=True)
+    pdf.cell(0, 10, f"Time: {compound_time}", ln=True)
+    pdf.multi_cell(0, 10, f"Offense: {compound_offense}")
 
     # ========== AMOUNT BOX ==========
     pdf.ln(4)
