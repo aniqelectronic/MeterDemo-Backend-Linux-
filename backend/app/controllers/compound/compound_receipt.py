@@ -17,7 +17,7 @@ def generate_single_compound_pdf(compound):
     # Escape to avoid invalid characters
     compound_name = html.escape(compound.name or "-")
     compound_no = html.escape(compound.compoundnum)
-    compound_plate = html.escape(compound.platenum or "-")      # FIXED
+    compound_plate = html.escape(compound.plate or "-")      # FIXED
     compound_date = compound.date.strftime("%Y-%m-%d")
     compound_time = compound.time.strftime("%H:%M")
     compound_offense = html.escape(compound.offense or "-")
