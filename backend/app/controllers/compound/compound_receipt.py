@@ -31,12 +31,13 @@ else:
 # SINGLE COMPOUND RECEIPT PDF (FPDF 1.x SAFE)
 # =====================================================
 def generate_single_compound_pdf(compound):
-    compound_name = safe_text(compound.name or "-")
-    compound_no = safe_text(compound.compoundnum)
-    compound_plate = safe_text(compound.plate or "-")
+
+    compound_name = compound.name or "-"
+    compound_no = compound.compoundnum or "-"
+    compound_plate = compound.plate or "-"
     compound_date = compound.date.strftime("%Y-%m-%d")
     compound_time = compound.time.strftime("%H:%M")
-    compound_offense = safe_text(compound.offense or "-")
+    compound_offense = compound.offense or "-"
     compound_amount = f"{float(compound.amount):.2f}"
 
     pdf = FPDF()
@@ -90,7 +91,7 @@ def generate_single_compound_pdf(compound):
     pdf.cell(0, 10, "Thank you for your payment!", ln=True, align="C")
 
     # ========== FOOTER ==========
-    footer_text = safe_text("2025 City Car Park System . All Rights Reserved")
+    footer_text = "2025 City Car Park System . All Rights Reserved"
     pdf.set_y(-15)
     pdf.set_font("Arial", "", 9)
     pdf.set_text_color(150, 150, 150)
