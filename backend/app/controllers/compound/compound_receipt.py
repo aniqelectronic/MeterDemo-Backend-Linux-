@@ -31,7 +31,6 @@ else:
 # SINGLE COMPOUND RECEIPT PDF (FPDF 1.x SAFE)
 # =====================================================
 def generate_single_compound_pdf(compound):
-
     compound_name = compound.name or "-"
     compound_no = compound.compoundnum or "-"
     compound_plate = compound.plate or "-"
@@ -57,9 +56,10 @@ def generate_single_compound_pdf(compound):
     pdf.line(20, 55, 190, 55)
     pdf.ln(10)
 
-    # ========== DETAILS CARD ==========
+    # ========== DETAILS BOX (NO ROUNDED CORNER) ==========
     pdf.set_fill_color(245, 247, 255)
-    pdf.rounded_rect(15, 60, 180, 110, 4, style="F")
+    pdf.set_draw_color(245, 247, 255)
+    pdf.rect(15, 60, 180, 110, style="F")
 
     pdf.set_xy(20, 65)
     pdf.set_font("Arial", "B", 14)
@@ -77,31 +77,24 @@ def generate_single_compound_pdf(compound):
     # ========== AMOUNT BOX ==========
     pdf.ln(4)
     pdf.set_fill_color(230, 240, 255)
-    pdf.rounded_rect(15, 175, 180, 15, 3, style="F")
+    pdf.set_draw_color(230, 240, 255)
+    pdf.rect(15, 175, 180, 15, style="F")
 
     pdf.set_xy(15, 175)
     pdf.set_font("Arial", "B", 16)
     pdf.set_text_color(0, 80, 180)
     pdf.cell(180, 15, f"Amount: RM {compound_amount}", align="C")
 
-    # ========== THANK YOU ==========
-    pdf.ln(20)
-    pdf.set_font("Arial", "I", 12)
-    pdf.set_text_color(40, 130, 60)
+    # ========== FOOTER ==========
+    pdf.set_y(-15)
+    pdf.set_font("Arial", "I", 10)
+    pdf.set_text_color(150, 150, 150)
     pdf.cell(0, 10, "Thank you for your payment!", ln=True, align="C")
 
-    # ========== FOOTER ==========
-    footer_text = "2025 City Car Park System . All Rights Reserved"
-    pdf.set_y(-15)
-    pdf.set_font("Arial", "", 9)
-    pdf.set_text_color(150, 150, 150)
-    pdf.cell(0, 10, footer_text, align="C")
-
-    # Output
     pdf_bytes = pdf.output(dest="S").encode("latin1")
     filename = f"compound_{compound_no}.pdf"
-    return upload_to_blob(filename, pdf_bytes, "application/pdf")
 
+    return upload_to_blob(filename, pdf_bytes, "application/pdf")
 
 
 # =====================================================
