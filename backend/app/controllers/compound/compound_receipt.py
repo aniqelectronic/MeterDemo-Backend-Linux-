@@ -31,11 +31,6 @@ else:
 # SINGLE COMPOUND RECEIPT PDF (FPDF)
 # =====================================================
 def generate_single_compound_pdf(compound):
-    """
-    Generate PDF and upload to blob storage. Returns URL.
-    """
-
-    # Escape fields
     compound_name = html.escape(compound.name or "-")
     compound_no = html.escape(compound.compoundnum)
     compound_plate = html.escape(compound.plate or "-")
@@ -44,43 +39,65 @@ def generate_single_compound_pdf(compound):
     compound_offense = html.escape(compound.offense or "-")
     compound_amount = f"{float(compound.amount):.2f}"
 
-    # ==== Build PDF ====
     pdf = FPDF()
     pdf.add_page()
 
-    # --- LOGO (FPDF requires FILE PATH, NOT ImageReader) ---
+    # ========== LOGO ==========
     if os.path.exists(LOGO_PATH):
-        pdf.image(LOGO_PATH, x=75, y=10, w=60)
-        pdf.ln(80)
+        pdf.image(LOGO_PATH, x=70, y=10, w=70)
+        pdf.ln(60)
 
-    # --- TITLE ---
-    pdf.set_font("Arial", "B", 18)
-    pdf.cell(0, 12, "Compound E-Receipt", ln=True, align="C")
-    pdf.ln(5)
+    # ========== TITLE ==========
+    pdf.set_font("Arial", "B", 20)
+    pdf.set_text_color(30, 30, 30)
+    pdf.cell(0, 12, "COMPOUND E-RECEIPT", ln=True, align="C")
 
-    # --- DETAILS ---
-    pdf.set_font("Arial", "", 13)
-    pdf.cell(0, 9, f"Name: {compound_name}", ln=True)
-    pdf.cell(0, 9, f"Compound No: {compound_no}", ln=True)
-    pdf.cell(0, 9, f"Plate No: {compound_plate}", ln=True)
-    pdf.cell(0, 9, f"Date: {compound_date}", ln=True)
-    pdf.cell(0, 9, f"Time: {compound_time}", ln=True)
-    pdf.multi_cell(0, 9, f"Offense: {compound_offense}")
+    pdf.set_draw_color(200, 200, 200)
+    pdf.line(20, 55, 190, 55)
+    pdf.ln(10)
+
+    # ========== DETAILS CARD ==========
+    pdf.set_fill_color(245, 247, 255)
+    pdf.rounded_rect(15, 60, 180, 110, 4, style="F")
+
+    pdf.set_xy(20, 65)
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 10, "Receipt Details", ln=True)
+
+    pdf.ln(3)
+    pdf.set_font("Arial", "", 12)
+    pdf.cell(0, 8, f"Name: {compound_name}", ln=True)
+    pdf.cell(0, 8, f"Compound No: {compound_no}", ln=True)
+    pdf.cell(0, 8, f"Plate No: {compound_plate}", ln=True)
+    pdf.cell(0, 8, f"Date: {compound_date}", ln=True)
+    pdf.cell(0, 8, f"Time: {compound_time}", ln=True)
+    pdf.multi_cell(0, 8, f"Offense: {compound_offense}")
+
+    # ========== AMOUNT BOX ==========
     pdf.ln(4)
+    pdf.set_fill_color(230, 240, 255)
+    pdf.rounded_rect(15, 175, 180, 15, 3, style="F")
 
-    pdf.set_font("Arial", "B", 15)
-    pdf.set_text_color(0, 102, 204)
-    pdf.cell(0, 12, f"Amount: RM {compound_amount}", ln=True, align="C")
-    pdf.set_text_color(0, 0, 0)
+    pdf.set_xy(15, 175)
+    pdf.set_font("Arial", "B", 16)
+    pdf.set_text_color(0, 80, 180)
+    pdf.cell(180, 15, f"Amount: RM {compound_amount}", align="C")
 
-    pdf.ln(6)
+    # ========== THANK YOU ==========
+    pdf.ln(20)
     pdf.set_font("Arial", "I", 12)
+    pdf.set_text_color(40, 130, 60)
     pdf.cell(0, 10, "Thank you for your payment!", ln=True, align="C")
 
-    # Output as bytes
+    # ========== FOOTER ==========
+    pdf.set_y(-15)
+    pdf.set_font("Arial", "", 9)
+    pdf.set_text_color(150, 150, 150)
+    pdf.cell(0, 10, "© 2025 City Car Park System • All Rights Reserved", align="C")
+
+    # Output
     pdf_bytes = pdf.output(dest="S").encode("latin1")
     filename = f"compound_{compound_no}.pdf"
-
     return upload_to_blob(filename, pdf_bytes, "application/pdf")
 
 
@@ -92,62 +109,69 @@ def generate_multi_compound_pdf(compounds, total_amount):
     pdf = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    top_y = height - 100
+    # ===== HEADER =====
+    top_y = height - 80
 
-    # --- LOGO ---
     if LOGO_RL:
         img_w, img_h = LOGO_RL.getSize()
-        w = 110
+        w = 120
         h = (img_h / img_w) * w
         x = (width - w) / 2
         y = top_y - h
         pdf.drawImage(LOGO_RL, x, y, width=w, height=h, mask="auto")
-        top_y = y - 50
+        top_y = y - 40
 
-    # --- TITLE ---
-    pdf.setFont("Helvetica-Bold", 20)
+    pdf.setFont("Helvetica-Bold", 22)
     pdf.drawCentredString(width / 2, top_y, "MULTIPLE COMPOUND RECEIPT")
 
     pdf.setFont("Helvetica", 12)
     pdf.setFillColor(colors.grey)
-    pdf.drawCentredString(width / 2, top_y - 18, "Generated Summary")
+    pdf.drawCentredString(width / 2, top_y - 20, "Official Transaction Record")
 
     y = top_y - 60
 
-    # --- TABLE HEADER ---
-    pdf.setFont("Helvetica-Bold", 14)
-    pdf.setFillColor(colors.HexColor("#F2F2F2"))
-    pdf.rect(50, y, 500, 30, fill=True, stroke=False)
-    pdf.setFillColor(colors.black)
-    pdf.drawString(60, y + 9, "Compound Number")
-    pdf.drawString(350, y + 9, "Amount (RM)")
+    # ===== TABLE HEADER =====
+    pdf.setFillColor(colors.HexColor("#E9F0FF"))
+    pdf.rect(40, y, 520, 28, fill=True, stroke=False)
 
-    y -= 40
+    pdf.setFillColor(colors.black)
+    pdf.setFont("Helvetica-Bold", 13)
+    pdf.drawString(50, y + 9, "Compound Number")
+    pdf.drawRightString(540, y + 9, "Amount (RM)")
+
+    y -= 35
     pdf.setFont("Helvetica", 12)
 
-    # --- TABLE CONTENT ---
+    # ===== TABLE ROWS =====
     for idx, c in enumerate(compounds):
         fill = colors.HexColor("#FAFAFA") if idx % 2 == 0 else colors.white
         pdf.setFillColor(fill)
-        pdf.rect(50, y, 500, 25, fill=True, stroke=False)
+        pdf.rect(40, y, 520, 22, fill=True, stroke=False)
 
         pdf.setFillColor(colors.black)
-        pdf.drawString(60, y + 7, c.get("compoundnum"))
-        pdf.drawRightString(520, y + 7, f"RM {float(c['amount']):.2f}")
+        pdf.drawString(50, y + 6, c["compoundnum"])
+        pdf.drawRightString(540, y + 6, f"{float(c['amount']):.2f}")
 
-        y -= 30
+        y -= 25
 
         if y <= 100:
             pdf.showPage()
-            y = height - 150
+            y = height - 120
 
-    # --- TOTAL ---
+    # ===== TOTAL BOX =====
     pdf.setFont("Helvetica-Bold", 16)
-    pdf.setFillColor(colors.black)
-    pdf.drawString(50, y - 20, f"TOTAL: RM {total_amount:.2f}")
+    pdf.setFillColor(colors.HexColor("#D6E9FF"))
+    pdf.rect(40, y - 40, 520, 30, fill=True, stroke=False)
 
-    pdf.showPage()
+    pdf.setFillColor(colors.black)
+    pdf.drawString(50, y - 20, f"TOTAL AMOUNT:")
+    pdf.drawRightString(540, y - 20, f"RM {total_amount:.2f}")
+
+    # ===== FOOTER =====
+    pdf.setFont("Helvetica", 9)
+    pdf.setFillColor(colors.grey)
+    pdf.drawCentredString(width / 2, 30, "© 2025 City Car Park System • All Rights Reserved")
+
     pdf.save()
     buffer.seek(0)
-
     return buffer
