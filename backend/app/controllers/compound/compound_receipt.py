@@ -76,12 +76,12 @@ def generate_single_compound_pdf(compound):
 
     pdf.set_font("Arial", "", 12)
     pdf.ln(2)
-    pdf.cell(0, 8, f"Name: {compound_name}", ln=True)
-    pdf.cell(0, 8, f"Compound No: {compound_no}", ln=True)
-    pdf.cell(0, 8, f"Plate No: {compound_plate}", ln=True)
-    pdf.cell(0, 8, f"Date: {compound_date}", ln=True)
-    pdf.cell(0, 8, f"Time: {compound_time}", ln=True)
-    pdf.multi_cell(0, 8, f"Offense: {compound_offense}")
+    pdf.cell(0, 11, f"Name: {compound_name}", ln=True)
+    pdf.cell(0, 11, f"Compound No: {compound_no}", ln=True)
+    pdf.cell(0, 11, f"Plate No: {compound_plate}", ln=True)
+    pdf.cell(0, 11, f"Date: {compound_date}", ln=True)
+    pdf.cell(0, 11, f"Time: {compound_time}", ln=True)
+    pdf.multi_cell(0, 11, f"Offense: {compound_offense}")
 
     # ========== AMOUNT BOX ==========
     amount_y = box_y + box_height + 12
@@ -95,7 +95,7 @@ def generate_single_compound_pdf(compound):
     pdf.cell(180, 15, f"Amount: RM {compound_amount}", align="C")
 
     # ========== FOOTER ==========
-    pdf.set_y(-15)
+    pdf.set_y(-10)
     pdf.set_font("Arial", "I", 10)
     pdf.set_text_color(150, 150, 150)
     pdf.cell(0, 10, "Thank you for your payment!", ln=True, align="C")
