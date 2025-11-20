@@ -14,7 +14,6 @@ import os
 
 LOGO_PATH = "app/resources/images/City_Car_Park_logo.png"
 
-# ReportLab ImageReader (used ONLY for multi PDF)
 LOGO_RL = None
 if os.path.exists(LOGO_PATH):
     try:
@@ -28,7 +27,7 @@ else:
 
 
 # =====================================================
-# SINGLE COMPOUND RECEIPT PDF (FPDF)
+# SINGLE COMPOUND RECEIPT PDF (FPDF 1.x SAFE)
 # =====================================================
 def generate_single_compound_pdf(compound):
     compound_name = html.escape(compound.name or "-")
@@ -56,9 +55,9 @@ def generate_single_compound_pdf(compound):
     pdf.line(20, 55, 190, 55)
     pdf.ln(10)
 
-    # ========== DETAILS CARD ==========
+    # ========== DETAILS BOX (NO ROUNDED RECT — SAFE) ==========
     pdf.set_fill_color(245, 247, 255)
-    pdf.rounded_rect(15, 60, 180, 110, 4, style="F")
+    pdf.rect(15, 60, 180, 110, style="F")  # ← REPLACED rounded_rect
 
     pdf.set_xy(20, 65)
     pdf.set_font("Arial", "B", 14)
@@ -76,7 +75,7 @@ def generate_single_compound_pdf(compound):
     # ========== AMOUNT BOX ==========
     pdf.ln(4)
     pdf.set_fill_color(230, 240, 255)
-    pdf.rounded_rect(15, 175, 180, 15, 3, style="F")
+    pdf.rect(15, 175, 180, 15, style="F")  # ← REPLACED rounded_rect
 
     pdf.set_xy(15, 175)
     pdf.set_font("Arial", "B", 16)
@@ -109,9 +108,9 @@ def generate_multi_compound_pdf(compounds, total_amount):
     pdf = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    # ===== HEADER =====
     top_y = height - 80
 
+    # ===== HEADER LOGO =====
     if LOGO_RL:
         img_w, img_h = LOGO_RL.getSize()
         w = 120
@@ -154,17 +153,18 @@ def generate_multi_compound_pdf(compounds, total_amount):
 
         y -= 25
 
+        # page break
         if y <= 100:
             pdf.showPage()
             y = height - 120
 
-    # ===== TOTAL BOX =====
+    # ===== TOTAL =====
     pdf.setFont("Helvetica-Bold", 16)
     pdf.setFillColor(colors.HexColor("#D6E9FF"))
     pdf.rect(40, y - 40, 520, 30, fill=True, stroke=False)
 
     pdf.setFillColor(colors.black)
-    pdf.drawString(50, y - 20, f"TOTAL AMOUNT:")
+    pdf.drawString(50, y - 20, "TOTAL AMOUNT:")
     pdf.drawRightString(540, y - 20, f"RM {total_amount:.2f}")
 
     # ===== FOOTER =====
