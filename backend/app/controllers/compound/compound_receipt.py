@@ -51,7 +51,7 @@ def generate_single_compound_pdf(compound):
     # --- LOGO (FPDF requires FILE PATH, NOT ImageReader) ---
     if os.path.exists(LOGO_PATH):
         pdf.image(LOGO_PATH, x=75, y=10, w=60)
-        pdf.ln(40)
+        pdf.ln(80)
 
     # --- TITLE ---
     pdf.set_font("Arial", "B", 18)
@@ -102,7 +102,7 @@ def generate_multi_compound_pdf(compounds, total_amount):
         x = (width - w) / 2
         y = top_y - h
         pdf.drawImage(LOGO_RL, x, y, width=w, height=h, mask="auto")
-        top_y = y - 25
+        top_y = y - 50
 
     # --- TITLE ---
     pdf.setFont("Helvetica-Bold", 20)
