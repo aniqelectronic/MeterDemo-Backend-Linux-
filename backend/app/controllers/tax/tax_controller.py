@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.models.tax.tax_model import OwnerCreate, PropertyCreate, TaxPaymentRequest, TaxResponse
-from app.schema.tax.tax_schema import CukaiTaksiran, Owner 
+from app.schema.tax.tax_schema import CukaiTaksiran, Owner, Property 
 
 router = APIRouter(prefix="/tax", tags=["Cukai Taksiran"])
 
