@@ -2,8 +2,8 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.database import get_db
-from app.models.tax.tax_model import CukaiTaksiran, Owner, TaxPaymentRequest
-from app.schema.tax.tax_schema import TaxCreate, TaxResponse
+from app.models.tax.tax_model import TaxPaymentRequest,TaxCreate, TaxResponse
+from app.schema.tax.tax_schema import CukaiTaksiran, Owner 
 
 router = APIRouter(prefix="/tax", tags=["Cukai Taksiran"])
 
