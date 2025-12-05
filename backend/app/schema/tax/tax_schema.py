@@ -1,14 +1,96 @@
-from sqlalchemy import Column, Integer, String, Float
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
+from datetime import datetime
 from app.db.database import Base
+from sqlalchemy.orm import relationship
 
-class Tax(Base):
-    __tablename__ = "taxes"
+# -----------------------------
+# Owners table
+# -----------------------------
+class Owner(Base):
+    __tablename__ = "owners"
 
     id = Column(Integer, primary_key=True, index=True)
-    taxnum = Column(String(30), unique=True, index=True)   # e.g. TAX2025000123
-    taxtype = Column(String(50), nullable=False)           # e.g. "property", "income"
-    owner_id = Column(Integer, nullable=False)
-    property_id = Column(Integer, nullable=False)
+    name = Column(String(150), nullable=False)
+    ic = Column(String(20))
+    phone = Column(String(30))
+    email = Column(String(120))
+    address = Column(String(255))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # relationship
+    properties = relationship("Property", back_populates="owner")
+    taxes = relationship("CukaiTaksiran", back_populates="owner")
+
+
+# -----------------------------
+# Properties table
+# -----------------------------
+class Property(Base):
+    __tablename__ = "properties"
+
+    id = Column(Integer, primary_key=True, index=True)
+    owner_id = Column(Integer, ForeignKey("owners.id"), nullable=False)
+    
+    account_no = Column(String(50), unique=True, nullable=False)
+    lot_no = Column(String(50))
+    house_no = Column(String(50))
+    street = Column(String(120))
+    address1 = Column(String(150))
+    address2 = Column(String(150))
+    zone = Column(String(50))
+    property_type = Column(String(50))
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # relationship
+    owner = relationship("Owner", back_populates="properties")
+    taxes = relationship("CukaiTaksiran", back_populates="property")
+
+
+# -----------------------------
+# Cukai Taksiran table
+# -----------------------------
+class CukaiTaksiran(Base):
+    __tablename__ = "cukai_taksiran"
+
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # FKs
+    property_id = Column(Integer, ForeignKey("properties.id"), nullable=False)
+    owner_id = Column(Integer, ForeignKey("owners.id"), nullable=False)
+
+    # Cached copy of owner name
+    owner_name = Column(String(150))
+
+    # Valuation fields
+    annual_value = Column(Float, nullable=False)
+    rate_percent = Column(Float, nullable=False)
+    half_year_amount = Column(Float, nullable=False)
+
+    # Billing cycle
     year = Column(Integer, nullable=False)
-    amount = Column(Float, nullable=False)
-    status = Column(String(20), nullable=False, default="unpaid")  # "unpaid" or "paid"
+    cycle = Column(String(10), nullable=False)  # H1 / H2
+    bill_no = Column(String(50), unique=True)
+    issue_date = Column(DateTime)
+    due_date = Column(DateTime)
+
+    # Payment fields
+    status = Column(String(20), default="unpaid")
+    paid_amount = Column(Float, default=0.0)
+    paid_date = Column(DateTime)
+    payment_ref = Column(String(100))
+
+    # Penalties / arrears
+    penalty_amount = Column(Float, default=0.0)
+    arrears = Column(Float, default=0.0)
+    total_payable = Column(Float, default=0.0)
+
+    # Audit
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # relationships
+    property = relationship("Property", back_populates="taxes")
+    owner = relationship("Owner", back_populates="taxes")
