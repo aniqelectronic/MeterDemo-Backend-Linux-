@@ -31,7 +31,16 @@ def create_property(prop: PropertyCreate, db: Session = Depends(get_db)):
 def create_multiple_taxes(taxes: List[TaxCreate], db: Session = Depends(get_db)):
     created_taxes = []
     for tax in taxes:
-        new_tax = CukaiTaksiran(**tax.dict())
+        # Fetch owner to get the correct name
+        owner = db.query(Owner).filter(Owner.id == tax.owner_id).first()
+        if not owner:
+            raise HTTPException(status_code=404, detail=f"Owner ID {tax.owner_id} not found")
+        
+        # Set owner_name from the Owner table
+        tax_data = tax.dict()
+        tax_data['owner_name'] = owner.name
+
+        new_tax = CukaiTaksiran(**tax_data)
 
         # Adjust issue_date, due_date, and default paid_date to Malaysia time (UTC+8)
         if new_tax.issue_date:
@@ -46,6 +55,7 @@ def create_multiple_taxes(taxes: List[TaxCreate], db: Session = Depends(get_db))
         db.refresh(new_tax)
         created_taxes.append(new_tax)
     return created_taxes
+
 
 # --- Get all taxes ---
 @router.get("/", response_model=List[TaxResponse])
