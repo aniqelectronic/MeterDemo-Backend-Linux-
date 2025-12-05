@@ -2,7 +2,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.database import get_db
-from app.models.tax.tax_model import OwnerCreate, PropertyCreate, TaxPaymentRequest, TaxResponse
+from app.models.tax.tax_model import OwnerCreate, PropertyCreate, TaxCreate, TaxPaymentRequest, TaxResponse
 from app.schema.tax.tax_schema import CukaiTaksiran, Owner, Property 
 
 router = APIRouter(prefix="/tax", tags=["Cukai Taksiran"])
@@ -25,6 +25,14 @@ def create_property(prop: PropertyCreate, db: Session = Depends(get_db)):
     db.refresh(new_prop)
     return new_prop
 
+# --- Create new tax record --- 
+@router.post("/", response_model=TaxResponse) 
+def create_tax(tax: TaxCreate, db: Session = Depends(get_db)): 
+    new_tax = CukaiTaksiran(**tax.dict()) 
+    db.add(new_tax) 
+    db.commit() 
+    db.refresh(new_tax) 
+    return new_tax
 
 # --- Get all taxes ---
 @router.get("/", response_model=list[TaxResponse])
