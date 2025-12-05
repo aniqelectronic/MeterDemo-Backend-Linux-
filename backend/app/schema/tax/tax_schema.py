@@ -49,15 +49,11 @@ class Property(Base):
     taxes = relationship("CukaiTaksiran", back_populates="property")
 
 
-# -----------------------------
-# Cukai Taksiran table
-# -----------------------------
 class CukaiTaksiran(Base):
     __tablename__ = "cukai_taksiran"
 
     id = Column(Integer, primary_key=True, index=True)
     
-    # FKs
     property_id = Column(Integer, ForeignKey("properties.id"), nullable=False)
     owner_id = Column(Integer, ForeignKey("owners.id"), nullable=False)
 
@@ -75,17 +71,6 @@ class CukaiTaksiran(Base):
     bill_no = Column(String(50), unique=True)
     issue_date = Column(DateTime)
     due_date = Column(DateTime)
-
-    # Payment fields
-    status = Column(String(20), default="unpaid")
-    paid_amount = Column(Float, default=0.0)
-    paid_date = Column(DateTime)
-    payment_ref = Column(String(100))
-
-    # Penalties / arrears
-    penalty_amount = Column(Float, default=0.0)
-    arrears = Column(Float, default=0.0)
-    total_payable = Column(Float, default=0.0)
 
     # Audit
     created_at = Column(DateTime, default=datetime.utcnow)

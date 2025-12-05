@@ -17,14 +17,6 @@ class TaxBase(BaseModel):
     bill_no: str | None = None
     issue_date: datetime | None = None
     due_date: datetime | None = None
-    status: str = "unpaid"  # unpaid / paid
-    paid_amount: float | None = 0.0
-    paid_date: datetime | None = None
-    payment_ref: str | None = None
-    penalty_amount: float | None = 0.0
-    arrears: float | None = 0.0
-    total_payable: float | None = 0.0
-
 
 # -----------------------------
 # Create schema
@@ -38,7 +30,6 @@ class OwnerCreate(BaseModel):
     phone: str | None = None
     email: str | None = None
     address: str | None = None
-    
 
 class PropertyCreate(BaseModel):
     owner_id: int
@@ -51,16 +42,6 @@ class PropertyCreate(BaseModel):
     zone: str | None = None
     property_type: str | None = None
 
-class TaxPaymentItem(BaseModel):
-    bill_no: str
-    paid_amount: float
-    payment_ref: str | None = None
-
-class TaxPaymentRequest(BaseModel):
-    payments: List[TaxPaymentItem]
-    paid_date: datetime | None = None  # optional, default to now
-    
-    
 # -----------------------------
 # Response schema
 # -----------------------------
@@ -68,4 +49,4 @@ class TaxResponse(TaxBase):
     id: int
 
     class Config:
-        from_attributes = True  # ✅ Pydantic v2
+        from_attributes = True
