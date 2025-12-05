@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.database import get_db
@@ -26,13 +27,16 @@ def create_property(prop: PropertyCreate, db: Session = Depends(get_db)):
     return new_prop
 
 # --- Create new tax record --- 
-@router.post("/", response_model=TaxResponse) 
-def create_tax(tax: TaxCreate, db: Session = Depends(get_db)): 
-    new_tax = CukaiTaksiran(**tax.dict()) 
-    db.add(new_tax) 
-    db.commit() 
-    db.refresh(new_tax) 
-    return new_tax
+@router.post("/", response_model=List[TaxResponse])
+def create_multiple_taxes(taxes: List[TaxCreate], db: Session = Depends(get_db)):
+    created_taxes = []
+    for tax in taxes:
+        new_tax = CukaiTaksiran(**tax.dict())
+        db.add(new_tax)
+        db.commit()
+        db.refresh(new_tax)
+        created_taxes.append(new_tax)
+    return created_taxes
 
 # --- Get all taxes ---
 @router.get("/", response_model=list[TaxResponse])
