@@ -32,6 +32,24 @@ class TaxBase(BaseModel):
 class TaxCreate(TaxBase):
     pass
 
+class OwnerCreate(BaseModel):
+    name: str
+    ic: str
+    phone: str | None = None
+    email: str | None = None
+    address: str | None = None
+    
+
+class PropertyCreate(BaseModel):
+    owner_id: int
+    account_no: str
+    lot_no: str | None = None
+    house_no: str | None = None
+    street: str | None = None
+    address1: str | None = None
+    address2: str | None = None
+    zone: str | None = None
+    property_type: str | None = None
 
 class TaxPaymentItem(BaseModel):
     bill_no: str
