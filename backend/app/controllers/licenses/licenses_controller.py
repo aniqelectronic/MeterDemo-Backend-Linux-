@@ -156,3 +156,16 @@ def view_license_receipt(licensenum: str, db: Session = Depends(get_db)):
     </html>
     """
     return HTMLResponse(content=html)
+
+
+# Get all licenses by owner IC
+@router.get("/by-ic/{ic}", response_model=list[LicenseResponse])
+def get_licenses_by_ic(ic: str, db: Session = Depends(get_db)):
+    # Check if owner exists
+    owner = db.query(OwnerLicense).filter(OwnerLicense.ic == ic).first()
+    if not owner:
+        raise HTTPException(status_code=404, detail="Owner not found")
+
+    # Get all licenses for this owner
+    licenses = db.query(License).filter(License.ic == ic).all()
+    return licenses
