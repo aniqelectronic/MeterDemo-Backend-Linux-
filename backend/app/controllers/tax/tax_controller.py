@@ -72,8 +72,8 @@ def get_tax(bill_no: str, db: Session = Depends(get_db)):
 
 
 # --- Get taxes by owner IC ---
-@router.get("/by-ic/{ic}", response_model=List[TaxResponse])
-def get_taxes_by_ic(ic: str, db: Session = Depends(get_db)):
+@router.get("/by-ic/{ic}")
+def get_taxes_by_ic_with_property_type(ic: str, db: Session = Depends(get_db)):
     owner = db.query(Owner).filter(Owner.ic == ic).first()
     if not owner:
         raise HTTPException(status_code=404, detail="Owner not found")
@@ -82,7 +82,15 @@ def get_taxes_by_ic(ic: str, db: Session = Depends(get_db)):
     if not taxes:
         raise HTTPException(status_code=404, detail="No taxes found for this owner")
     
-    return taxes
+    # Add property_type for each tax
+    result = []
+    for tax in taxes:
+        tax_dict = tax.__dict__.copy()  # convert to dict
+        tax_dict['property_type'] = tax.property.property_type
+        result.append(tax_dict)
+    
+    return result
+
 
 # --- Renew tax by extending due_date or creating new record ---
 @router.post("/renew/{bill_no}", response_model=TaxResponse)
