@@ -64,7 +64,12 @@ def get_tax(bill_no: str, db: Session = Depends(get_db)):
     tax = db.query(CukaiTaksiran).filter(CukaiTaksiran.bill_no == bill_no).first()
     if not tax:
         raise HTTPException(status_code=404, detail="Tax not found")
-    return tax
+
+    # Dynamically add property_type
+    result = tax.__dict__
+    result['property_type'] = tax.property.property_type
+    return result
+
 
 # --- Get taxes by owner IC ---
 @router.get("/by-ic/{ic}", response_model=List[TaxResponse])
