@@ -47,8 +47,7 @@ def create_license(license: LicenseCreate, db: Session = Depends(get_db)):
     if not owner:
         raise HTTPException(status_code=404, detail="Owner not found")
 
-    # Auto-detect license type (optional)
-    licensetype = license.licensetype or "Unknown"
+    # Auto-detect license type
     if "BIZ" in license.licensenum:
         licensetype = "Business License"
     elif "HBR" in license.licensenum:
@@ -57,19 +56,27 @@ def create_license(license: LicenseCreate, db: Session = Depends(get_db)):
         licensetype = "Advertisement License"
     elif "KOM" in license.licensenum:
         licensetype = "Composite License"
+    else:
+        licensetype = "Unknown"
+
+    # Start date today, end date +1 year
+    today = date.today()
+    end_date = today + timedelta(days=365)
 
     new_license = License(
         licensenum=license.licensenum,
         licensetype=licensetype,
         ic=license.ic,
         amount=license.amount,
-        start_date=None,
-        end_date=None
+        start_date=today,
+        end_date=end_date
     )
+
     db.add(new_license)
     db.commit()
     db.refresh(new_license)
     return new_license
+
 
 # Pay license
 @router.post("/pay/{licensenum}", response_model=LicenseResponse)
@@ -78,13 +85,19 @@ def pay_license(licensenum: str, db: Session = Depends(get_db)):
     if not license_obj:
         raise HTTPException(status_code=404, detail="License not found")
 
-    # Set start and end dates
-    license_obj.start_date = date.today()
-    license_obj.end_date = license_obj.start_date + timedelta(days=365)
+    # If end_date is in the past or today, start from today
+    today = date.today()
+    if not license_obj.end_date or license_obj.end_date < today:
+        license_obj.start_date = today
+        license_obj.end_date = today + timedelta(days=365)
+    else:
+        # Renew: extend end_date by 1 year from current end_date
+        license_obj.end_date = license_obj.end_date + timedelta(days=365)
 
     db.commit()
     db.refresh(license_obj)
     return license_obj
+
 
 # Get all licenses
 @router.get("/", response_model=list[LicenseResponse])
