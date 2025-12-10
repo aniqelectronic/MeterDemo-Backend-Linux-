@@ -2,50 +2,67 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from fpdf import FPDF
-import io
-import qrcode
 from io import BytesIO
 from datetime import date, timedelta
-from app.utils.blob_upload import upload_to_blob
+import qrcode
 
-
-# ----------------- CONFIG -----------------
 from app.db.database import get_db
+from app.utils.blob_upload import upload_to_blob
 from app.utils.config import BASE_URL
-from app.schema.licenses.licenses_schema import License
-from app.models.licenses.licenses_model import LicenseCreate, LicenseResponse, StatusTypeEnum
+from app.models.licenses.licenses_model  import (
+    LicenseCreate, LicenseResponse,
+    OwnerLicenseCreate, OwnerLicenseResponse
+)
+from app.schema.licenses.licenses_schema import License, OwnerLicense
 
 router = APIRouter(prefix="/license", tags=["License"])
 
+# ----------------- OWNER ENDPOINTS -----------------
 
-# --- Helper function to detect license type & year ---
-def parse_license_details(licensenum: str):
-    if "BIZ" in licensenum:
-        licensetype = "Business License"
-    elif "HBR" in licensenum:
-        licensetype = "Entertainment / Buskers License"
-    elif "IKL" in licensenum:
-        licensetype = "Advertisement License"
-    elif "KOM" in licensenum:
-        licensetype = "Composite License"
-    else:
-        licensetype = "Unknown"
+@router.post("/owner", response_model=OwnerLicenseResponse)
+def create_owner(owner: OwnerLicenseCreate, db: Session = Depends(get_db)):
+    # Check if owner already exists
+    existing = db.query(OwnerLicense).filter(OwnerLicense.ic == owner.ic).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Owner with this IC already exists")
 
-    year = int(licensenum[7:11])    
-    return licensetype, year
+    new_owner = OwnerLicense(
+        ic=owner.ic,
+        name=owner.name,
+        email=owner.email,
+        address=owner.address
+    )
+    db.add(new_owner)
+    db.commit()
+    db.refresh(new_owner)
+    return new_owner
 
+# ----------------- LICENSE ENDPOINTS -----------------
 
-# --- Create a new license ---
+# Create a new license
 @router.post("/", response_model=LicenseResponse)
 def create_license(license: LicenseCreate, db: Session = Depends(get_db)):
-    licensetype, year = parse_license_details(license.licensenum)
+    # Ensure owner exists
+    owner = db.query(OwnerLicense).filter(OwnerLicense.ic == license.ic).first()
+    if not owner:
+        raise HTTPException(status_code=404, detail="Owner not found")
+
+    # Auto-detect license type (optional)
+    licensetype = license.licensetype or "Unknown"
+    if "BIZ" in license.licensenum:
+        licensetype = "Business License"
+    elif "HBR" in license.licensenum:
+        licensetype = "Entertainment / Buskers License"
+    elif "IKL" in license.licensenum:
+        licensetype = "Advertisement License"
+    elif "KOM" in license.licensenum:
+        licensetype = "Composite License"
+
     new_license = License(
         licensenum=license.licensenum,
         licensetype=licensetype,
-        owner_id=license.owner_id,
-        year=year,
+        ic=license.ic,
         amount=license.amount,
-        status=StatusTypeEnum.unpaid,   # default unpaid
         start_date=None,
         end_date=None
     )
@@ -54,19 +71,14 @@ def create_license(license: LicenseCreate, db: Session = Depends(get_db)):
     db.refresh(new_license)
     return new_license
 
-
-# --- Pay license ---
+# Pay license
 @router.post("/pay/{licensenum}", response_model=LicenseResponse)
 def pay_license(licensenum: str, db: Session = Depends(get_db)):
     license_obj = db.query(License).filter(License.licensenum == licensenum).first()
     if not license_obj:
         raise HTTPException(status_code=404, detail="License not found")
 
-    if license_obj.status == StatusTypeEnum.active:
-        raise HTTPException(status_code=400, detail="License already active")
-
-    # Activate license
-    license_obj.status = StatusTypeEnum.active
+    # Set start and end dates
     license_obj.start_date = date.today()
     license_obj.end_date = license_obj.start_date + timedelta(days=365)
 
@@ -74,41 +86,29 @@ def pay_license(licensenum: str, db: Session = Depends(get_db)):
     db.refresh(license_obj)
     return license_obj
 
-
-# --- Auto-expire check ---
-def check_expiry(license_obj: License, db: Session):
-    if license_obj.end_date and date.today() > license_obj.end_date:
-        license_obj.status = StatusTypeEnum.expired
-        db.commit()
-        db.refresh(license_obj)
-    return license_obj
-
-
-# --- Get all licenses ---
+# Get all licenses
 @router.get("/", response_model=list[LicenseResponse])
 def get_licenses(db: Session = Depends(get_db)):
-    licenses = db.query(License).all()
-    return [check_expiry(l, db) for l in licenses]
+    return db.query(License).all()
 
-
-# --- Get single license by ID ---
-@router.get("/{license_id}", response_model=LicenseResponse)
-def get_license(license_id: str, db: Session = Depends(get_db)):
-    license_obj = db.query(License).filter(License.licensenum == license_id).first()
+# Get single license by number
+@router.get("/{licensenum}", response_model=LicenseResponse)
+def get_license(licensenum: str, db: Session = Depends(get_db)):
+    license_obj = db.query(License).filter(License.licensenum == licensenum).first()
     if not license_obj:
         raise HTTPException(status_code=404, detail="License not found")
-    return check_expiry(license_obj, db)
+    return license_obj
 
-
-# ================= LICENSE RECEIPT (HTML PAGE) =================
+# License receipt with QR
 @router.get("/receipt/qr/{licensenum}", response_class=HTMLResponse)
 def view_license_receipt(licensenum: str, db: Session = Depends(get_db)):
     license_obj = db.query(License).filter(License.licensenum == licensenum).first()
     if not license_obj:
         raise HTTPException(status_code=404, detail="License not found")
 
-    license_obj = check_expiry(license_obj, db)
-    
+    owner = db.query(OwnerLicense).filter(OwnerLicense.ic == license_obj.ic).first()
+    owner_name = owner.name if owner else "N/A"
+
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16)
@@ -117,14 +117,11 @@ def view_license_receipt(licensenum: str, db: Session = Depends(get_db)):
     pdf.set_font("Arial", '', 12)
     pdf.cell(0, 8, f"License No: {license_obj.licensenum}", ln=True)
     pdf.cell(0, 8, f"Type: {license_obj.licensetype}", ln=True)
-    pdf.cell(0, 8, f"Year: {license_obj.year}", ln=True)
-    pdf.cell(0, 8, f"Owner ID: {license_obj.owner_id}", ln=True)
+    pdf.cell(0, 8, f"Owner IC: {license_obj.ic}", ln=True)
+    pdf.cell(0, 8, f"Owner Name: {owner_name}", ln=True)
     pdf.cell(0, 8, f"Amount: RM {license_obj.amount:.2f}", ln=True)
-    pdf.cell(0, 8, f"Status: {license_obj.status.value if license_obj.status else 'N/A'}", ln=True)
     pdf.cell(0, 8, f"Start Date: {license_obj.start_date}", ln=True)
     pdf.cell(0, 8, f"End Date: {license_obj.end_date}", ln=True)
-    pdf.ln(10)
-    pdf.cell(0, 10, "Thank you for your payment!", ln=True, align="C")
 
     pdf_bytes = pdf.output(dest="S").encode("latin1")
     pdf_filename = f"license_{license_obj.licensenum}.pdf"
@@ -132,171 +129,17 @@ def view_license_receipt(licensenum: str, db: Session = Depends(get_db)):
 
     html = f"""
     <html>
-        <head>
-            <title>License E-Receipt</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-                body {{
-                    font-family: Arial, sans-serif;
-                    margin: 0;
-                    padding: 0;
-                    background: #f5f5f5;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    min-height: 100vh;
-                }}
-                .receipt {{
-                    background: white;
-                    padding: 30px 40px;
-                    border-radius: 15px;
-                    box-shadow: 0 0 15px rgba(0,0,0,0.1);
-                    width: 90%;
-                    max-width: 600px;
-                    font-size: 18px;
-                    line-height: 1.6;
-                }}
-                h2 {{
-                    color: #111;
-                    text-align: center;
-                    font-size: 26px;
-                    margin-bottom: 25px;
-                    letter-spacing: 0.5px;
-                }}
-                p {{
-                    margin: 8px 0;
-                    font-size: 17px;
-                }}
-                .thankyou {{
-                    margin-top: 25px;
-                    font-size: 20px;
-                    font-weight: bold;
-                    text-align: center;
-                    color: #2a7a2a;
-                }}
-                .footer {{
-                    margin-top: 25px;
-                    font-size: 14px;
-                    color: gray;
-                    text-align: center;
-                }}
-                .download-btn {{
-                    display: block;
-                    text-align: center;
-                    margin-top: 25px;
-                }}
-                .download-btn a {{
-                    text-decoration: none;
-                    background-color: #4CAF50;
-                    color: white;
-                    padding: 10px 25px;
-                    font-size: 16px;
-                    border-radius: 8px;
-                    transition: 0.2s;
-                }}
-                .download-btn a:hover {{
-                    background-color: #45a049;
-                }}
-                @media print {{
-                    body {{
-                        background: white;
-                    }}
-                    .receipt {{
-                        box-shadow: none;
-                        border: none;
-                        width: 100%;
-                        font-size: 16px;
-                        padding: 20px;
-                    }}
-                    .download-btn {{ display: none; }}
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="receipt">
-                <h2>License E-Receipt</h2>
-                <p><b>License No:</b> {license_obj.licensenum}</p>
-                <p><b>Type:</b> {license_obj.licensetype}</p>
-                <p><b>Year:</b> {license_obj.year}</p>
-                <p><b>Owner ID:</b> {license_obj.owner_id}</p>
-                <p><b>Amount:</b> 
-                    <span style="font-size:20px; font-weight:bold; color:#000;">
-                        RM {license_obj.amount:.2f}
-                    </span>
-                </p>
-                <p><b>Status:</b> {license_obj.status.value if license_obj.status else 'N/A'}</p>
-                <p><b>Start Date:</b> {license_obj.start_date}</p>
-                <p><b>End Date:</b> {license_obj.end_date}</p>
-    
-                <div class="thankyou">Thank you for your payment!</div>
-    
-                <div class="download-btn">
-                    <a href="{pdf_url}" target="_blank">
-                        Download PDF
-                    </a>
-                </div>
-    
-                <div class="footer">Generated by License System</div>
-            </div>
+        <body style="font-family:Arial;text-align:center;padding:30px;">
+            <h2>License E-Receipt</h2>
+            <p><b>License No:</b> {license_obj.licensenum}</p>
+            <p><b>Type:</b> {license_obj.licensetype}</p>
+            <p><b>Owner IC:</b> {license_obj.ic}</p>
+            <p><b>Owner Name:</b> {owner_name}</p>
+            <p><b>Amount:</b> RM {license_obj.amount:.2f}</p>
+            <p><b>Start Date:</b> {license_obj.start_date}</p>
+            <p><b>End Date:</b> {license_obj.end_date}</p>
+            <a href="{pdf_url}" target="_blank">Download PDF</a>
         </body>
     </html>
     """
-
-    html_bytes = html.encode("utf-8")
-    filename = f"compound_{license_obj.licensenum}.html"
-
-    # ✅ Upload to Azure Blob
-    blob_url = upload_to_blob(filename, html_bytes, content_type="text/html")
-    
-        # Generate QR for Blob URL
-    receipt_url = blob_url
-    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
-    qr.add_data(receipt_url)
-    qr.make(fit=True)
-
-    img = qr.make_image(fill_color="black", back_color="white")
-    buf = BytesIO()
-    img.save(buf, format="PNG")
-    buf.seek(0)
-
-    return StreamingResponse(buf, media_type="image/png")
-
-
-# ================= LICENSE QR DUMMY PAYMENT =================
-@router.get("/html/qrdummy/{licensenum}", response_class=HTMLResponse)
-def qr_page(licensenum: str):
-    return f"""
-    <html>
-    <body style='text-align:center;margin-top:200px;'>
-        <h1>License Payment</h1>
-        <p>License No: {licensenum}</p>
-        <button style='font-size:30px;padding:20px;'
-            onclick="fetch('/license/pay/{licensenum}', {{ method:'POST' }})
-            .then(()=>alert('Payment Successful!'));"
-        >
-            PAY
-        </button>
-    </body>
-    </html>
-    """
-
-
-@router.get("/qrdummy/{licensenum}")
-def generate_receipt_qr(licensenum: str, db: Session = Depends(get_db)):
-    receipt_url = f"{BASE_URL}/license/html/qrdummy/{licensenum}"
-
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
-    )
-    qr.add_data(receipt_url)
-    qr.make(fit=True)
-
-    img = qr.make_image(fill_color="black", back_color="white")
-    buf = BytesIO()
-    img.save(buf, format="PNG")
-    buf.seek(0)
-
-    return StreamingResponse(buf, media_type="image/png")
+    return HTMLResponse(content=html)

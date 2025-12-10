@@ -1,31 +1,33 @@
 from pydantic import BaseModel
-from enum import Enum
 from datetime import date
 
 class LicenseBase(BaseModel):
     licensenum: str
-    owner_id: int
+    ic: str             # links to OwnerLicense
     amount: float
-    status: str   # unpaid / paid
 
 class LicenseCreate(LicenseBase):
-    pass
+    licensetype: str | None = None  # optional, can be auto-set
 
 class LicenseResponse(LicenseBase):
-    licensenum: str
-    licensetype: str
-    owner_id: int
-    year: int
-    amount: float
-    status: str
     id: int
+    licensetype: str
     start_date: date | None = None
     end_date: date | None = None
 
     class Config:
         from_attributes = True
 
-class StatusTypeEnum(str, Enum):
-    unpaid = "unpaid"
-    active = "active"
-    expired = "expired"
+
+class OwnerLicenseBase(BaseModel):
+    ic: str
+    name: str
+    email: str | None = None
+    address: str | None = None
+
+class OwnerLicenseCreate(OwnerLicenseBase):
+    pass
+
+class OwnerLicenseResponse(OwnerLicenseBase):
+    class Config:
+        from_attributes = True
