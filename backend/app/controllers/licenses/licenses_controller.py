@@ -14,6 +14,7 @@ from app.models.licenses.licenses_model  import (
     OwnerLicenseCreate, OwnerLicenseResponse
 )
 from app.schema.licenses.licenses_schema import License, OwnerLicense
+from backend.app.controllers.licenses.licenses_receipt import generate_multi_license_pdf
 
 router = APIRouter(prefix="/license", tags=["License"])
 
@@ -156,6 +157,187 @@ def view_license_receipt(licensenum: str, db: Session = Depends(get_db)):
     </html>
     """
     return HTMLResponse(content=html)
+
+
+@router.post("/receipt/qr/multi")
+def generate_multi_license_receipt(payload: dict, db: Session = Depends(get_db)):
+    """
+    Payload example:
+    {
+        "licenses": ["LCP-00123", "LCP-00456"]
+    }
+    """
+
+    license_numbers = payload.get("licenses", [])
+
+    if not license_numbers:
+        raise HTTPException(status_code=400, detail="No license numbers provided")
+
+    licenses_data = []
+    total_amount = 0.0
+
+    # --- Fetch all licenses from DB ---
+    for lic in license_numbers:
+        lic_obj = db.query(License).filter(License.licensenum == lic).first()
+        if not lic_obj:
+            raise HTTPException(status_code=404, detail=f"License {lic} not found")
+
+        owner = db.query(OwnerLicense).filter(OwnerLicense.ic == lic_obj.ic).first()
+        owner_name = owner.name if owner else "N/A"
+
+        licenses_data.append({
+            "licensenumber": lic_obj.licensenum,
+            "licensetype": lic_obj.licensetype,
+            "expired_date": lic_obj.end_date,
+            "amount": lic_obj.amount,
+            "owner_name": owner_name,
+            "ic": lic_obj.ic
+        })
+
+        total_amount += lic_obj.amount
+
+    # === Generate PDF ===
+    pdf_buffer = generate_multi_license_pdf(licenses_data, total_amount)
+
+    pdf_filename = "multi_license_receipt.pdf"
+    pdf_url = upload_to_blob(
+        pdf_filename,
+        pdf_buffer.getvalue(),
+        content_type="application/pdf"
+    )
+
+    # --- Generate table rows ---
+    rows_html = ""
+    for c in licenses_data:
+        rows_html += f"""
+            <tr>
+                <td>{c['licensenumber']}</td>
+                <td>{c['licensetype']}</td>
+                <td>{c['expired_date']}</td>
+                <td>RM {float(c['amount']):.2f}</td>
+            </tr>
+        """
+
+    # --- HTML Receipt ---
+    html = f"""
+    <html>
+    <head>
+        <title>Multiple License Receipt</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body {{
+                font-family: 'Segoe UI', Tahoma, sans-serif;
+                background: #e8ebef;
+                padding: 25px;
+                margin: 0;
+            }}
+            .receipt {{
+                background: white;
+                padding: 35px;
+                max-width: 750px;
+                border-radius: 16px;
+                margin: 0 auto;
+                box-shadow: 0px 6px 20px rgba(0,0,0,0.08);
+            }}
+            .header {{
+                background: #2F80ED;
+                color: white;
+                padding: 18px;
+                font-size: 24px;
+                text-align: center;
+                border-radius: 12px;
+            }}
+            table {{
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 25px;
+            }}
+            th {{
+                background: #f5f8ff;
+                padding: 12px;
+                border-bottom: 2px solid #e0e0e0;
+                font-size: 16px;
+                font-weight: bold;
+            }}
+            td {{
+                padding: 12px;
+                text-align: center;
+                border-bottom: 1px solid #eee;
+            }}
+            .total {{
+                margin-top: 20px;
+                background: #f4f7ff;
+                padding: 15px;
+                font-size: 20px;
+                font-weight: bold;
+                border-left: 6px solid #2F80ED;
+                border-radius: 10px;
+                text-align: right;
+            }}
+            .pdf-button {{
+                margin-top: 25px;
+                text-align: center;
+            }}
+            .pdf-button a {{
+                background: #27ae60;
+                padding: 12px 20px;
+                color: white;
+                font-size: 18px;
+                border-radius: 10px;
+                text-decoration: none;
+            }}
+        </style>
+    </head>
+    <body>
+
+    <div class="receipt">
+        <div class="header">Multiple License Receipt</div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>License Number</th>
+                    <th>License Type</th>
+                    <th>Expired Date</th>
+                    <th>Amount (RM)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows_html}
+            </tbody>
+        </table>
+
+        <div class="total">
+            Total: RM {float(total_amount):.2f}
+        </div>
+
+        <div class="pdf-button">
+            <a href="{pdf_url}" target="_blank">Download PDF Receipt</a>
+        </div>
+    </div>
+
+    </body>
+    </html>
+    """
+
+    # --- Upload HTML ---
+    html_bytes = html.encode("utf-8")
+    filename = "multi_license_receipt.html"
+    blob_url = upload_to_blob(filename, html_bytes, content_type="text/html")
+
+    # --- Generate QR ---
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L)
+    qr.add_data(blob_url)
+    qr.make(fit=True)
+
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = BytesIO()
+    img.save(buf, "PNG")
+    buf.seek(0)
+
+    return StreamingResponse(buf, media_type="image/png")
+
+
 
 
 # Get all licenses by owner IC
