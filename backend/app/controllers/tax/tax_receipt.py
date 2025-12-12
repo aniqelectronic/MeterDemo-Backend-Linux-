@@ -57,7 +57,7 @@ def generate_multi_tax_pdf(Taxes, total_amount):
     col_x = {
         "bill_no": 50,
         "property_type": 150,
-        "address": 300,
+        "address": 250,
         "amount": 520
     }
 
