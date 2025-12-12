@@ -14,7 +14,7 @@ from app.models.licenses.licenses_model  import (
     OwnerLicenseCreate, OwnerLicenseResponse
 )
 from app.schema.licenses.licenses_schema import License, OwnerLicense
-from backend.app.controllers.licenses.licenses_receipt import generate_multi_license_pdf
+from app.controllers.licenses.licenses_receipt import generate_multi_license_pdf
 
 router = APIRouter(prefix="/license", tags=["License"])
 
