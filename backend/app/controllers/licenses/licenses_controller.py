@@ -251,18 +251,22 @@ def generate_multi_license_receipt(payload: dict, db: Session = Depends(get_db))
                 width: 100%;
                 border-collapse: collapse;
                 margin-top: 25px;
+                table-layout: fixed; 
             }}
             th {{
-                background: #f5f8ff;
-                padding: 12px;
-                border-bottom: 2px solid #e0e0e0;
-                font-size: 16px;
-                font-weight: bold;
+                 background: #f5f8ff;
+                 padding: 12px;
+                 border-bottom: 2px solid #e0e0e0;
+                 font-size: 16px;
+                 font-weight: bold;
+                 word-wrap: break-word;
             }}
             td {{
                 padding: 12px;
                 text-align: center;
                 border-bottom: 1px solid #eee;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
             }}
             .total {{
                 margin-top: 20px;
