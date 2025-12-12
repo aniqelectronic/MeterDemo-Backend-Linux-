@@ -221,7 +221,7 @@ def generate_multi_license_receipt(payload: dict, db: Session = Depends(get_db))
     html = f"""
     <html>
     <head>
-        <title>Multiple License Receipt</title>
+        <title>License Receipt</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
             body {{

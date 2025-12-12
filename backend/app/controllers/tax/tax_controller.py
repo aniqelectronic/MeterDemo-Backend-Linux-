@@ -1,10 +1,15 @@
 from datetime import datetime, timedelta
+from io import BytesIO
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
+import qrcode
 from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.models.tax.tax_model import OwnerCreate, PropertyCreate, TaxCreate, TaxResponse
-from app.schema.tax.tax_schema import CukaiTaksiran, Owner, Property 
+from app.schema.tax.tax_schema import CukaiTaksiran, Owner, Property
+from app.controllers.tax.tax_receipt import generate_multi_tax_pdf
+from app.utils.blob_upload import upload_to_blob 
 
 router = APIRouter(prefix="/tax", tags=["Cukai Taksiran"])
 
@@ -106,3 +111,204 @@ def renew_tax(bill_no: str, db: Session = Depends(get_db), extra_days: int = 180
     db.commit()
     db.refresh(tax)
     return tax
+
+
+@router.post("/receipt/qr/multi")
+def generate_multi_tax_receipt(payload: dict, db: Session = Depends(get_db)):
+    """
+    Payload example:
+    {
+        "bill_no": ["BILL2025001", "BILL2025002"]
+    }
+    """
+    bill_nos = payload.get("bill_no", [])
+
+    if not bill_nos:
+        raise HTTPException(status_code=400, detail="No bill numbers provided")
+
+    taxes_data = []
+    total_amount = 0.0
+
+    # --- Fetch all tax records from DB ---
+    for bill_no in bill_nos:
+        tax_obj = db.query(CukaiTaksiran).filter(CukaiTaksiran.bill_no == bill_no).first()
+        if not tax_obj:
+            raise HTTPException(status_code=404, detail=f"Bill {bill_no} not found")
+
+        prop = tax_obj.property
+        owner_name = tax_obj.owner_name or (tax_obj.owner.name if tax_obj.owner else "N/A")
+
+        taxes_data.append({
+            "bill_no": tax_obj.bill_no,
+            "property_type": prop.property_type if prop else "N/A",
+            "lot_no": prop.lot_no if prop else "",
+            "house_no": prop.house_no if prop else "",
+            "street": prop.street if prop else "",
+            "address1": prop.address1 if prop else "",
+            "address2": prop.address2 if prop else "",
+            "zone": prop.zone if prop else "",
+            "amount": tax_obj.half_year_amount,
+            "owner_name": owner_name
+        })
+
+        total_amount += tax_obj.half_year_amount
+
+    # === Generate PDF ===
+    pdf_buffer = generate_multi_tax_pdf(taxes_data, total_amount)
+    pdf_filename = "multi_tax_receipt.pdf"
+    pdf_url = upload_to_blob(
+        pdf_filename,
+        pdf_buffer.getvalue(),
+        content_type="application/pdf"
+    )
+
+    # --- Generate table rows for HTML ---
+    rows_html = ""
+    for t in taxes_data:
+        address_parts = [
+            t.get("lot_no", ""),
+            t.get("house_no", ""),
+            t.get("street", ""),
+            t.get("address1", ""),
+            t.get("address2", ""),
+            t.get("zone", "")
+        ]
+        full_address = ", ".join([p for p in address_parts if p])
+
+        rows_html += f"""
+            <tr>
+                <td>{t['bill_no']}</td>
+                <td>{t['property_type']}</td>
+                <td>{full_address}</td>
+                <td>RM {float(t['amount']):.2f}</td>
+            </tr>
+        """
+
+    # --- HTML Receipt ---
+    html = f"""
+    <html>
+    <head>
+        <title>Tax Receipt</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body {{
+                font-family: 'Segoe UI', Tahoma, sans-serif;
+                background: #e8ebef;
+                padding: 25px;
+                margin: 0;
+            }}
+            .receipt {{
+                background: white;
+                padding: 35px;
+                max-width: 800px;
+                border-radius: 16px;
+                margin: 0 auto;
+                box-shadow: 0px 6px 20px rgba(0,0,0,0.08);
+            }}
+            .header {{
+                background: #2F80ED;
+                color: white;
+                padding: 18px;
+                font-size: 24px;
+                text-align: center;
+                border-radius: 12px;
+            }}
+            .table-container {{
+                width: 100%;
+                overflow-x: auto;
+                margin-top: 25px;
+            }}
+            table {{
+                border-collapse: collapse;
+                width: 100%;
+                min-width: 700px;
+                white-space: nowrap;
+                table-layout: auto;
+            }}
+            th {{
+                background: #f5f8ff;
+                border-bottom: 2px solid #e0e0e0;
+                padding: 12px;
+                font-size: 16px;
+                font-weight: bold;
+                text-align: center;
+            }}
+            td {{
+                padding: 12px;
+                text-align: center;
+                border-bottom: 1px solid #eee;
+            }}
+            .total {{
+                margin-top: 20px;
+                background: #f4f7ff;
+                padding: 15px;
+                font-size: 20px;
+                font-weight: bold;
+                border-left: 6px solid #2F80ED;
+                border-radius: 10px;
+                text-align: right;
+            }}
+            .pdf-button {{
+                margin-top: 25px;
+                text-align: center;
+            }}
+            .pdf-button a {{
+                background: #27ae60;
+                padding: 12px 20px;
+                color: white;
+                font-size: 18px;
+                border-radius: 10px;
+                text-decoration: none;
+            }}
+        </style>
+    </head>
+    <body>
+
+    <div class="receipt">
+        <div class="header">Multiple Tax Receipt</div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Bill No.</th>
+                        <th>Property Type</th>
+                        <th>Address</th>
+                        <th>Amount (RM)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows_html}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="total">
+            Total: RM {float(total_amount):.2f}
+        </div>
+
+        <div class="pdf-button">
+            <a href="{pdf_url}" target="_blank">Download PDF Receipt</a>
+        </div>
+    </div>
+
+    </body>
+    </html>
+    """
+
+    # --- Upload HTML ---
+    html_bytes = html.encode("utf-8")
+    filename = "multi_tax_receipt.html"
+    blob_url = upload_to_blob(filename, html_bytes, content_type="text/html")
+
+    # --- Generate QR ---
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L)
+    qr.add_data(blob_url)
+    qr.make(fit=True)
+
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = BytesIO()
+    img.save(buf, "PNG")
+    buf.seek(0)
+
+    return StreamingResponse(buf, media_type="image/png")
