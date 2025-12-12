@@ -248,13 +248,15 @@ def generate_multi_license_receipt(payload: dict, db: Session = Depends(get_db))
             }}
             .table-container {{
                 width: 100%;
-                overflow-x: auto;   /* Horizontal scroll if table too wide */
+                overflow-x: auto;       /* Enable horizontal scroll */
+                margin-top: 25px;
             }}
             table {{
-                width: 100%;
                 border-collapse: collapse;
-                margin-top: 25px;
-                white-space: nowrap;  /* Prevent text wrapping */
+                width: 100%;
+                min-width: 600px;       /* Ensure table is wide enough */
+                white-space: nowrap;     /* Prevent text wrapping */
+                table-layout: auto;      /* Columns size based on content */
             }}
             th {{
                 background: #f5f8ff;
