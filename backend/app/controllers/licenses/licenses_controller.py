@@ -164,7 +164,7 @@ def generate_multi_license_receipt(payload: dict, db: Session = Depends(get_db))
     """
     Payload example:
     {
-        "licenses": ["LCP-00123", "LCP-00456"]
+        "licenses": ["BIZ2025001", "BIZ2025002"]
     }
     """
 
@@ -198,7 +198,6 @@ def generate_multi_license_receipt(payload: dict, db: Session = Depends(get_db))
 
     # === Generate PDF ===
     pdf_buffer = generate_multi_license_pdf(licenses_data, total_amount)
-
     pdf_filename = "multi_license_receipt.pdf"
     pdf_url = upload_to_blob(
         pdf_filename,
@@ -247,26 +246,28 @@ def generate_multi_license_receipt(payload: dict, db: Session = Depends(get_db))
                 text-align: center;
                 border-radius: 12px;
             }}
+            .table-container {{
+                width: 100%;
+                overflow-x: auto;   /* Horizontal scroll if table too wide */
+            }}
             table {{
                 width: 100%;
                 border-collapse: collapse;
                 margin-top: 25px;
-                table-layout: fixed; 
+                white-space: nowrap;  /* Prevent text wrapping */
             }}
             th {{
-                 background: #f5f8ff;
-                 padding: 12px;
-                 border-bottom: 2px solid #e0e0e0;
-                 font-size: 16px;
-                 font-weight: bold;
-                 word-wrap: break-word;
+                background: #f5f8ff;
+                border-bottom: 2px solid #e0e0e0;
+                padding: 12px;
+                font-size: 16px;
+                font-weight: bold;
+                text-align: center;
             }}
             td {{
                 padding: 12px;
                 text-align: center;
                 border-bottom: 1px solid #eee;
-                word-wrap: break-word;
-                overflow-wrap: break-word;
             }}
             .total {{
                 margin-top: 20px;
@@ -297,19 +298,21 @@ def generate_multi_license_receipt(payload: dict, db: Session = Depends(get_db))
     <div class="receipt">
         <div class="header">Multiple License Receipt</div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>License Number</th>
-                    <th>License Type</th>
-                    <th>Expired Date</th>
-                    <th>Amount (RM)</th>
-                </tr>
-            </thead>
-            <tbody>
-                {rows_html}
-            </tbody>
-        </table>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>License Number</th>
+                        <th>License Type</th>
+                        <th>Expired Date</th>
+                        <th>Amount (RM)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows_html}
+                </tbody>
+            </table>
+        </div>
 
         <div class="total">
             Total: RM {float(total_amount):.2f}
