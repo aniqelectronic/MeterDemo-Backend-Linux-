@@ -4,6 +4,9 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 from reportlab.lib import colors
 import os
+from reportlab.platypus import Paragraph
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.enums import TA_LEFT
 
 LOGO_PATH = "app/resources/images/City_Car_Park_logo.png"
 
@@ -17,7 +20,6 @@ if os.path.exists(LOGO_PATH):
         print(f"[WARN] Failed to load ReportLab logo: {e}")
 else:
     print(f"[WARN] Logo path does not exist: {LOGO_PATH}")
-
 
 def generate_multi_tax_pdf(Taxes, total_amount):
     buffer = BytesIO()
@@ -67,6 +69,15 @@ def generate_multi_tax_pdf(Taxes, total_amount):
     y -= 35
     pdf.setFont("Helvetica", 11)
 
+    # Paragraph style for wrapping address
+    address_style = ParagraphStyle(
+        name="addressStyle",
+        fontName="Helvetica",
+        fontSize=11,
+        leading=13,
+        alignment=TA_LEFT
+    )
+
     # ===== TABLE ROWS =====
     for idx, t in enumerate(Taxes):
         fill = colors.HexColor("#FAFAFA") if idx % 2 == 0 else colors.white
@@ -84,12 +95,21 @@ def generate_multi_tax_pdf(Taxes, total_amount):
             t.get("address2", ""),
             t.get("zone", "")
         ]
-        full_address = ", ".join([p for p in address_parts if p])  # skip empty parts
+        full_address = ", ".join([p for p in address_parts if p])
 
+        # Draw Bill No and Property Type
         pdf.drawString(col_x["bill_no"], y + 6, str(t["bill_no"]))
         pdf.drawString(col_x["property_type"], y + 6, str(t["property_type"]))
-        pdf.drawString(col_x["address"], y + 6, full_address)
-        pdf.drawRightString(col_x["amount"], y + 6, f"{float(t['half_year_amount']):.2f}")
+
+        # Draw Address (wrapped if too long)
+        p = Paragraph(full_address, address_style)
+        p_width = col_x["amount"] - col_x["address"] - 10  # width for address column
+        p_height = 20  # approximate height
+        p.wrap(p_width, p_height)
+        p.drawOn(pdf, col_x["address"], y + 3)
+
+        # Draw Amount
+        pdf.drawRightString(col_x["amount"], y + 6, f"{float(t['amount']):.2f}")
 
         y -= 25
 
