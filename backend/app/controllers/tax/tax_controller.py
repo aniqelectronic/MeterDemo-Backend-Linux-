@@ -312,3 +312,58 @@ def generate_multi_tax_receipt(payload: dict, db: Session = Depends(get_db)):
     buf.seek(0)
 
     return StreamingResponse(buf, media_type="image/png")
+
+
+@router.post("/pay/multi")
+def pay_multiple_taxes(
+    payload: dict,
+    db: Session = Depends(get_db),
+    extra_days: int = 180
+):
+    """
+    Payload example:
+    {
+        "bill_no": ["BILL2025001", "BILL2025002"]
+    }
+    """
+
+    bill_nos = payload.get("bill_no", [])
+
+    if not bill_nos:
+        raise HTTPException(status_code=400, detail="No bill numbers provided")
+
+    updated_taxes = []
+    total_amount = 0.0
+
+    for bill_no in bill_nos:
+        tax = db.query(CukaiTaksiran).filter(
+            CukaiTaksiran.bill_no == bill_no
+        ).first()
+
+        if not tax:
+            raise HTTPException(status_code=404, detail=f"Bill {bill_no} not found")
+
+        # Extend due date
+        tax.due_date += timedelta(days=extra_days)
+
+        total_amount += tax.half_year_amount
+        updated_taxes.append(tax)
+
+    db.commit()
+
+    for tax in updated_taxes:
+        db.refresh(tax)
+
+    return {
+        "message": "Multiple tax bills paid successfully",
+        "total_amount": round(total_amount, 2),
+        "paid_bills": [
+            {
+                "bill_no": t.bill_no,
+                "owner_name": t.owner_name,
+                "amount": t.half_year_amount,
+                "new_due_date": t.due_date
+            }
+            for t in updated_taxes
+        ]
+    }
