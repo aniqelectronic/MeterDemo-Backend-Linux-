@@ -105,6 +105,53 @@ def pay_license(licensenum: str, db: Session = Depends(get_db)):
 def get_licenses(db: Session = Depends(get_db)):
     return db.query(License).all()
 
+@router.post("/pay/multi")
+def pay_multiple_licenses(payload: dict, db: Session = Depends(get_db)):
+    """
+    Payload example:
+    {
+        "licenses": ["BIZ2025001", "BIZ2025002"]
+    }
+    """
+
+    license_numbers = payload.get("licenses", [])
+
+    if not license_numbers:
+        raise HTTPException(status_code=400, detail="No license numbers provided")
+
+    today = date.today()
+    updated_licenses = []
+    total_amount = 0.0
+
+    # --- Fetch & update licenses ---
+    for lic_no in license_numbers:
+        lic = db.query(License).filter(License.licensenum == lic_no).first()
+        if not lic:
+            raise HTTPException(status_code=404, detail=f"License {lic_no} not found")
+
+        # Renew logic
+        if not lic.end_date or lic.end_date < today:
+            lic.start_date = today
+            lic.end_date = today + timedelta(days=365)
+        else:
+            lic.end_date = lic.end_date + timedelta(days=365)
+
+        total_amount += lic.amount
+        updated_licenses.append(lic)
+
+    db.commit()
+
+    # Refresh all updated objects
+    for lic in updated_licenses:
+        db.refresh(lic)
+
+    return {
+        "message": "Multiple licenses paid successfully",
+        "total_amount": round(total_amount, 2),
+        "licenses": updated_licenses
+    }
+
+
 # Get single license by number
 @router.get("/{licensenum}", response_model=LicenseResponse)
 def get_license(licensenum: str, db: Session = Depends(get_db)):
@@ -362,48 +409,3 @@ def get_licenses_by_ic(ic: str, db: Session = Depends(get_db)):
     return licenses
 
 
-@router.post("/pay/multi")
-def pay_multiple_licenses(payload: dict, db: Session = Depends(get_db)):
-    """
-    Payload example:
-    {
-        "licenses": ["BIZ2025001", "BIZ2025002"]
-    }
-    """
-
-    license_numbers = payload.get("licenses", [])
-
-    if not license_numbers:
-        raise HTTPException(status_code=400, detail="No license numbers provided")
-
-    today = date.today()
-    updated_licenses = []
-    total_amount = 0.0
-
-    # --- Fetch & update licenses ---
-    for lic_no in license_numbers:
-        lic = db.query(License).filter(License.licensenum == lic_no).first()
-        if not lic:
-            raise HTTPException(status_code=404, detail=f"License {lic_no} not found")
-
-        # Renew logic
-        if not lic.end_date or lic.end_date < today:
-            lic.start_date = today
-            lic.end_date = today + timedelta(days=365)
-        else:
-            lic.end_date = lic.end_date + timedelta(days=365)
-
-        total_amount += lic.amount
-        updated_licenses.append(lic)
-
-    db.commit()
-
-    # Refresh all updated objects
-    for lic in updated_licenses:
-        db.refresh(lic)
-
-    return {
-        "message": "Multiple licenses paid successfully",
-        "total_amount": round(total_amount, 2),
-        "licenses": updated_licenses
-    }
