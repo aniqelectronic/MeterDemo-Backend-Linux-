@@ -105,7 +105,7 @@ def pay_license(licensenum: str, db: Session = Depends(get_db)):
 def get_licenses(db: Session = Depends(get_db)):
     return db.query(License).all()
 
-@router.post("/pay/multi")
+@router.post("/pay-multi")
 def pay_multiple_licenses(payload: dict, db: Session = Depends(get_db)):
     """
     Payload example:
