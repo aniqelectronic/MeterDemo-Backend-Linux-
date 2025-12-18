@@ -114,10 +114,22 @@ def pay_multiple_licenses(payload: dict, db: Session = Depends(get_db)):
     }
     """
 
-    license_numbers = payload.get("licenses", [])
-
+    license_numbers = payload.get("licenses")
+    
+    if not isinstance(license_numbers, list):
+        raise HTTPException(
+            status_code=400,
+            detail="licenses must be a list of license numbers"
+        )
+    
+    license_numbers = [lic.strip() for lic in license_numbers if lic.strip()]
+    
     if not license_numbers:
-        raise HTTPException(status_code=400, detail="No license numbers provided")
+        raise HTTPException(
+            status_code=400,
+            detail="No valid license numbers provided"
+        )
+    
 
     today = date.today()
     updated_licenses = []
@@ -148,7 +160,7 @@ def pay_multiple_licenses(payload: dict, db: Session = Depends(get_db)):
     return {
         "message": "Multiple licenses paid successfully",
         "total_amount": round(total_amount, 2),
-        "licenses": updated_licenses
+        "count": len(updated_licenses)
     }
 
 
