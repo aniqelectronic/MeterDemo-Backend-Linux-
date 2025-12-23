@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import HTMLResponse
 import requests, time
 from sqlalchemy.orm import Session
 from app.models.pegepay.pegepay_model import OrderCreateRequest, OrderStatusRequest
@@ -206,3 +207,59 @@ def get_all_orders(db: Session = Depends(get_db)):
         }
         for o in orders
     ]
+    
+@router.get("/iframe-wrapper", response_class=HTMLResponse)
+def iframe_wrapper(iframe_url: str):
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>PegePay QR Payment</title>
+        <style>
+            body {{
+                margin: 0;
+                display: flex;
+                flex-direction: column;
+                justify-content: flex-start;
+                align-items: center;
+                background: #ffffff;
+                font-family: Arial, sans-serif;
+            }}
+            iframe {{
+                width: 1080px;
+                height: 1400px;
+                border: none;
+            }}
+            button {{
+                width: 1080px;
+                height: 120px;
+                font-size: 36px;
+                font-weight: bold;
+                color: white;
+                background-color: red;
+                border: none;
+                cursor: pointer;
+            }}
+        </style>
+    </head>
+    <body>
+        <iframe src="{iframe_url}" allowfullscreen></iframe>
+        <button onclick="cancelPayment()">Batal / Cancel</button>
+
+        <script>
+            function cancelPayment() {{
+                // Close window if possible
+                if (window.close) {{
+                    window.close();
+                }}
+                // Or redirect back to your Flutter app URL
+                else {{
+                    window.location.href = '/'; // optional fallback
+                }}
+            }}
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
