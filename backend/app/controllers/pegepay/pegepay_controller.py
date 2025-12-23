@@ -250,13 +250,11 @@ def iframe_wrapper(iframe_url: str):
         <script>
             function cancelPayment() {{
                 // Close window if possible
-                if (window.close) {{
-                    window.close();
-                }}
-                // Or redirect back to your Flutter app URL
-                else {{
-                    window.location.href = '/'; // optional fallback
-                }}
+            if (window.flutter_inappwebview) {{
+                window.flutter_inappwebview.callHandler('cancelPayment');
+            }} else {{
+                console.log('Flutter handler not found');
+            }}
             }}
         </script>
     </body>
