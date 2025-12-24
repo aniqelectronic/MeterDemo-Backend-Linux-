@@ -262,10 +262,14 @@ def iframe_wrapper(iframe_url: str):
         </div>
 
         <script>
-            function cancelPayment() {{
-                // ✅ This WORKS for desktop_webview_window
-                window.close();
-            }}
+    function cancelPayment() {{
+        // ❌ window.close() won't work
+        if (window.flutter_inappwebview) {{
+            // for webview_flutter, optional
+        }}
+        // Send message to Flutter via custom URL scheme
+        window.location.href = "app://cancelPayment";
+    }}
         </script>
     </body>
     </html>
