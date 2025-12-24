@@ -224,11 +224,14 @@ def iframe_wrapper(iframe_url: str):
                 display: flex;
                 flex-direction: column;
                 align-items: center;
+                zoom: 1.5;
             }}
 
             iframe {{
                 width: 1080px;
                 height: 1400px;
+                transform: scale(1.5);   /* zoom 1.5x */
+                transform-origin: top left;
                 border: none;
             }}
 
