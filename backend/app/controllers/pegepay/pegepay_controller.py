@@ -219,42 +219,52 @@ def iframe_wrapper(iframe_url: str):
         <style>
             body {{
                 margin: 0;
-                display: flex;
-                flex-direction: column;
-                justify-content: flex-start;
-                align-items: center;
                 background: #ffffff;
                 font-family: Arial, sans-serif;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
             }}
+
             iframe {{
                 width: 1080px;
                 height: 1400px;
                 border: none;
             }}
+
+            .button-container {{
+                margin-top: 30px;
+                margin-bottom: 30px;
+            }}
+
             button {{
-                width: 1080px;
-                height: 120px;
-                font-size: 36px;
+                width: 400px;        /* 👈 smaller width */
+                height: 80px;        /* 👈 smaller height */
+                font-size: 28px;
                 font-weight: bold;
                 color: white;
                 background-color: red;
                 border: none;
+                border-radius: 10px;
                 cursor: pointer;
+            }}
+
+            button:active {{
+                background-color: darkred;
             }}
         </style>
     </head>
     <body>
         <iframe src="{iframe_url}" allowfullscreen></iframe>
-        <button onclick="cancelPayment()">Batal / Cancel</button>
+
+        <div class="button-container">
+            <button onclick="cancelPayment()">Batal / Cancel</button>
+        </div>
 
         <script>
             function cancelPayment() {{
-                // Close window if possible
-            if (window.flutter_inappwebview) {{
-                window.flutter_inappwebview.callHandler('cancelPayment');
-            }} else {{
-                console.log('Flutter handler not found');
-            }}
+                // ✅ This WORKS for desktop_webview_window
+                window.close();
             }}
         </script>
     </body>
