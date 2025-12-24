@@ -230,6 +230,8 @@ def iframe_wrapper(iframe_url: str):
                 width: 1080px;
                 height: 1400px;
                 border: none;
+                transform: scale(1.5);    /* zoom 1.5x */
+                transform-origin: top left; /* make it zoom from top-left corner */
             }}
 
             .button-container {{
