@@ -314,7 +314,7 @@ def iframe_wrapper(iframe_url: str):
              border: none;
          
              transform: scale(1.5);   /* 👈 this zooms */
-             transform-origin: top left;
+             transform-origin: top centre;
 
             }}
 
