@@ -299,12 +299,8 @@ def iframe_wrapper(iframe_url: str):
             }}
 
             .iframe-container {{
-                width: 1080px;   /* keep original width */
-                height: 1400px;  /* keep original height */
-                border: none;
-            
-                transform: scale(1.5);   /* 👈 this zooms */
-                transform-origin: top left;
+                width: 100vw;
+                height: 85vh;
                 overflow: hidden;
                 display: flex;
                 justify-content: center;
@@ -313,9 +309,13 @@ def iframe_wrapper(iframe_url: str):
             }}
 
             .iframe-container iframe {{
-                width: 140%;   /* 👈 zoom effect */
-                height: 140%;
-                border: none;
+             width: 1080px;   /* keep original width */
+             height: 1400px;  /* keep original height */
+             border: none;
+         
+             transform: scale(1.5);   /* 👈 this zooms */
+             transform-origin: top left;
+
             }}
 
             .button-container {{
