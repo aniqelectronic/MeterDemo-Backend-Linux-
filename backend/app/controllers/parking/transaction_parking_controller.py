@@ -153,9 +153,8 @@ def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
                 <h2>Parking E-Receipt</h2>
                 <p><b>Ticket ID:</b> {transaction.ticket_id}</p>
                 <p><b>Plate:</b> {transaction.plate}</p>
-                <p><b>Time In:</b> {parking.timein.strftime("%d/%m/%Y %H:%M") if parking and parking.timein else "N/A"}</p>
-                <p><b>Time Out:</b> {parking.timeout.strftime("%d/%m/%Y %H:%M") if parking and parking.timeout else "N/A"}</p>
-                <p><b>Time Out:</b> {parking.timeout if parking else "N/A"}</p>
+                <p><b>Time In:</b> {parking.timein.strftime("%d/%m/%Y %H:%M %p") if parking and parking.timein else "N/A"}</p>
+                <p><b>Time Out:</b> {parking.timeout.strftime("%d/%m/%Y %H:%M %p") if parking and parking.timeout else "N/A"}</p>
                 <p><b>Amount:</b> 
                     <span style="font-size:38px; font-weight:bold; color:#000;">
                         RM {transaction.amount:.2f}
@@ -390,8 +389,8 @@ def get_latest_qr(db: Session = Depends(get_db)):
               <p><b>Ticket ID:</b> <span>{tx.ticket_id}</span></p>
               <p><b>Plate Number:</b> <span>{tx.plate}</span></p>
               <p><b>Duration (Hours):</b> <span>{tx.hours}</span></p>
-              <p><b>Time In:</b> {parking.timein.strftime("%d/%m/%Y %H:%M") if parking and parking.timein else "N/A"}</p>
-              <p><b>Time Out:</b> {parking.timeout.strftime("%d/%m/%Y %H:%M") if parking and parking.timeout else "N/A"}</p>
+              <p><b>Time In:</b> {parking.timein.strftime("%d/%m/%Y %H:%M %p") if parking and parking.timein else "N/A"}</p>
+              <p><b>Time Out:</b> {parking.timeout.strftime("%d/%m/%Y %H:%M %p") if parking and parking.timeout else "N/A"}</p>
               <p><b>Transaction Type:</b> <span>{tx.transaction_type if tx else "N/A"}</span></p>
             </div>
   
@@ -460,6 +459,6 @@ def get_latest_receipt_by_plate(plate: str, db: Session = Depends(get_db)):
         "hours": transaction.hours,
         "amount": transaction.amount,
         "transaction_type": transaction.transaction_type,
-        "time_in": parking.timein.strftime("%d/%m/%Y %H:%M") if parking and parking.timein else None,
-        "time_out": parking.timeout.strftime("%d/%m/%Y %H:%M") if parking and parking.timeout else None,
+        "time_in": parking.timein.strftime("%d/%m/%Y %H:%M %p") if parking and parking.timein else None,
+        "time_out": parking.timeout.strftime("%d/%m/%Y %H:%M %p") if parking and parking.timeout else None,
     }
