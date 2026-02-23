@@ -459,6 +459,6 @@ def get_latest_receipt_by_plate(plate: str, db: Session = Depends(get_db)):
         "hours": transaction.hours,
         "amount": transaction.amount,
         "transaction_type": transaction.transaction_type,
-        "time_in": parking.timein.strftime("%d/%m/%Y %H:%M %p") if parking and parking.timein else None,
-        "time_out": parking.timeout.strftime("%d/%m/%Y %H:%M %p") if parking and parking.timeout else None,
+        "time_in": parking.timein.strftime("%d/%m/%Y %H:%M") if parking and parking.timein else None,
+        "time_out": parking.timeout.strftime("%d/%m/%Y %H:%M") if parking and parking.timeout else None,
     }
