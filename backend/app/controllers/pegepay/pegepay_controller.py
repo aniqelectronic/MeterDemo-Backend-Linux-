@@ -230,6 +230,8 @@ def iframe_wrapper(iframe_url: str):
                 width: 1080px;
                 height: 1400px;
                 border: none;
+                transform: scale(1.5);   /* 🔥 increase this */
+                transform-origin: top left;
             }}
 
             .button-container {{
@@ -255,7 +257,9 @@ def iframe_wrapper(iframe_url: str):
         </style>
     </head>
     <body>
-        <iframe src="{iframe_url}" allowfullscreen></iframe>
+        <div class="iframe-wrapper">
+          <iframe src="{iframe_url}" allowfullscreen></iframe>
+        </div>
 
         <div class="button-container">
             <button onclick="cancelPayment()">Batal / Cancel</button>
