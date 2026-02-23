@@ -84,8 +84,8 @@ def generate_parking_receipt(
         ("Ticket ID", ticket_id),
         ("Plate Number", plate),
         ("Parking Duration", f"{hours:.2f} hour(s)"),
-        ("Time In", time_in.strftime("%d/%m/%Y %I:%M %p")),
-        ("Time Out", time_out.strftime("%d/%m/%Y %I:%M %p")),
+        ("Time In", time_in.replace(second=0, microsecond=0).strftime("%d/%m/%Y %I:%M %p")),
+        ("Time Out", time_out.replace(second=0, microsecond=0).strftime("%d/%m/%Y %I:%M %p")),
         ("Transaction Type", transaction_type.capitalize()),
         ("Amount Paid (RM)", f"{amount:.2f}"),
     ]
