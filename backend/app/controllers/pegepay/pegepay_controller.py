@@ -309,8 +309,8 @@ def iframe_wrapper(iframe_url: str):
             }}
 
             .iframe-container iframe {{
-                width: 140%;   /* 👈 zoom effect */
-                height: 140%;
+                width: 200%;   /* 👈 zoom effect */
+                height: 200%;
                 border: none;
             }}
 
