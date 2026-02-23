@@ -208,6 +208,75 @@ def get_all_orders(db: Session = Depends(get_db)):
         for o in orders
     ]
     
+# @router.get("/iframe-wrapper", response_class=HTMLResponse)
+# def iframe_wrapper(iframe_url: str):
+#     html_content = f"""
+#     <!DOCTYPE html>
+#     <html lang="en">
+#     <head>
+#         <meta charset="UTF-8">
+#         <title>PegePay QR Payment</title>
+#         <style>
+#             body {{
+#                 margin: 0;
+#                 background: #ffffff;
+#                 font-family: Arial, sans-serif;
+#                 display: flex;
+#                 flex-direction: column;
+#                 align-items: center;
+#             }}
+
+#             iframe {{
+#                 width: 1080px;
+#                 height: 1400px;
+#                 border: none;
+#             }}
+
+#             .button-container {{
+#                 margin-top: 30px;
+#                 margin-bottom: 30px;
+#             }}
+
+#             button {{
+#                 width: 400px;        /* 👈 smaller width */
+#                 height: 80px;        /* 👈 smaller height */
+#                 font-size: 28px;
+#                 font-weight: bold;
+#                 color: white;
+#                 background-color: red;
+#                 border: none;
+#                 border-radius: 10px;
+#                 cursor: pointer;
+#             }}
+
+#             button:active {{
+#                 background-color: darkred;
+#             }}
+#         </style>
+#     </head>
+#     <body>
+#         <iframe src="{iframe_url}" allowfullscreen></iframe>
+
+#         <div class="button-container">
+#             <button onclick="cancelPayment()">Batal / Cancel</button>
+#         </div>
+
+#         <script>
+#     function cancelPayment() {{
+#         // ❌ window.close() won't work
+#         if (window.flutter_inappwebview) {{
+#             // for webview_flutter, optional
+#         }}
+#         // Send message to Flutter via custom URL scheme
+#         window.location.href = "app://cancelPayment";
+#     }}
+#         </script>
+#     </body>
+#     </html>
+#     """
+#     return HTMLResponse(content=html_content)
+
+
 @router.get("/iframe-wrapper", response_class=HTMLResponse)
 def iframe_wrapper(iframe_url: str):
     html_content = f"""
@@ -216,30 +285,45 @@ def iframe_wrapper(iframe_url: str):
     <head>
         <meta charset="UTF-8">
         <title>PegePay QR Payment</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
         <style>
             body {{
                 margin: 0;
                 background: #ffffff;
                 font-family: Arial, sans-serif;
+                overflow: hidden; /* 🚫 no scrolling */
                 display: flex;
                 flex-direction: column;
                 align-items: center;
             }}
 
-            iframe {{
-                width: 1080px;
-                height: 1400px;
+            .iframe-container {{
+                width: 100vw;
+                height: 85vh;
+                overflow: hidden;
+                display: flex;
+                justify-content: center;
+                align-items: flex-start;
+                background: white;
+            }}
+
+            .iframe-container iframe {{
+                width: 140%;   /* 👈 zoom effect */
+                height: 140%;
                 border: none;
             }}
 
             .button-container {{
-                margin-top: 30px;
-                margin-bottom: 30px;
+                width: 100%;
+                display: flex;
+                justify-content: center;
+                margin-top: 20px;
             }}
 
             button {{
-                width: 400px;        /* 👈 smaller width */
-                height: 80px;        /* 👈 smaller height */
+                width: 400px;
+                height: 80px;
                 font-size: 28px;
                 font-weight: bold;
                 color: white;
@@ -254,8 +338,12 @@ def iframe_wrapper(iframe_url: str):
             }}
         </style>
     </head>
+
     <body>
-        <iframe src="{iframe_url}" allowfullscreen></iframe>
+
+        <div class="iframe-container">
+            <iframe src="{iframe_url}" allowfullscreen></iframe>
+        </div>
 
         <div class="button-container">
             <button onclick="cancelPayment()">Batal / Cancel</button>
@@ -271,6 +359,7 @@ def iframe_wrapper(iframe_url: str):
         window.location.href = "app://cancelPayment";
     }}
         </script>
+
     </body>
     </html>
     """
