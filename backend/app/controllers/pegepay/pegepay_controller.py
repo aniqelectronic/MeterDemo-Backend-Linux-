@@ -300,7 +300,7 @@ def iframe_wrapper(iframe_url: str):
 
             .iframe-container {{
                 width: 100vw;
-                height: 60vh;
+                height: 65vh;
                 overflow: hidden;
                 display: flex;
                 justify-content: center;
@@ -313,7 +313,7 @@ def iframe_wrapper(iframe_url: str):
              height: 1400px;  /* keep original height */
              border: none;
          
-             transform: scale(2.0) translateX(-50%) translateY(-20%);
+             transform: scale(2.5) translateX(-50%) translateY(-20%);
              transform-origin: top left;
 
             }}
