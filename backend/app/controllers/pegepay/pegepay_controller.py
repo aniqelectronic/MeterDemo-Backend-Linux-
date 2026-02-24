@@ -320,7 +320,7 @@ def iframe_wrapper(iframe_url: str):
 
             .button-container {{
              position: fixed;
-             bottom: 40px;
+             bottom: 300px;
              left: 50%;
              transform: translateX(-50%);
              z-index: 999;
