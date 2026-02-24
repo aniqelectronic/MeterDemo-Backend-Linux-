@@ -319,10 +319,11 @@ def iframe_wrapper(iframe_url: str):
             }}
 
             .button-container {{
-                width: 100%;
-                display: flex;
-                justify-content: center;
-                margin-top: 20px;
+             position: fixed;
+             bottom: 40px;
+             left: 50%;
+             transform: translateX(-50%);
+             z-index: 999;
             }}
 
             button {{
