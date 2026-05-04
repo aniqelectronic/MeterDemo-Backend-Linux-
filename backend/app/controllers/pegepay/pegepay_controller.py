@@ -363,6 +363,7 @@ def get_all_orders(db: Session = Depends(get_db)):
         for o in orders
     ]
     
+
 # @router.get("/iframe-wrapper", response_class=HTMLResponse)
 # def iframe_wrapper(iframe_url: str):
 #     html_content = f"""
@@ -371,30 +372,50 @@ def get_all_orders(db: Session = Depends(get_db)):
 #     <head>
 #         <meta charset="UTF-8">
 #         <title>PegePay QR Payment</title>
+#         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 #         <style>
 #             body {{
 #                 margin: 0;
 #                 background: #ffffff;
 #                 font-family: Arial, sans-serif;
+#                 overflow: hidden; /* 🚫 no scrolling */
 #                 display: flex;
 #                 flex-direction: column;
 #                 align-items: center;
 #             }}
 
-#             iframe {{
-#                 width: 1080px;
-#                 height: 1400px;
-#                 border: none;
+#             .iframe-container {{
+#                 width: 100vw;
+#                 height: 65vh;
+#                 overflow: hidden;
+#                 display: flex;
+#                 justify-content: center;
+#                 align-items: flex-start;
+#                 background: white;
+#             }}
+
+#             .iframe-container iframe {{
+#              width: 1080px;   /* keep original width */
+#              height: 1400px;  /* keep original height */
+#              border: none;
+         
+#              transform: scale(2.5) translateX(-55%) translateY(-20%);
+#              transform-origin: top left;
+
 #             }}
 
 #             .button-container {{
-#                 margin-top: 30px;
-#                 margin-bottom: 30px;
+#              position: fixed;
+#              bottom: 300px;
+#              left: 50%;
+#              transform: translateX(-50%);
+#              z-index: 999;
 #             }}
 
 #             button {{
-#                 width: 400px;        /* 👈 smaller width */
-#                 height: 80px;        /* 👈 smaller height */
+#                 width: 400px;
+#                 height: 80px;
 #                 font-size: 28px;
 #                 font-weight: bold;
 #                 color: white;
@@ -409,8 +430,12 @@ def get_all_orders(db: Session = Depends(get_db)):
 #             }}
 #         </style>
 #     </head>
+
 #     <body>
-#         <iframe src="{iframe_url}" allowfullscreen></iframe>
+
+#         <div class="iframe-container">
+#             <iframe src="{iframe_url}" allowfullscreen></iframe>
+#         </div>
 
 #         <div class="button-container">
 #             <button onclick="cancelPayment()">Batal / Cancel</button>
@@ -426,6 +451,7 @@ def get_all_orders(db: Session = Depends(get_db)):
 #         window.location.href = "app://cancelPayment";
 #     }}
 #         </script>
+
 #     </body>
 #     </html>
 #     """
@@ -434,93 +460,93 @@ def get_all_orders(db: Session = Depends(get_db)):
 
 @router.get("/iframe-wrapper", response_class=HTMLResponse)
 def iframe_wrapper(iframe_url: str):
-    html_content = f"""
+
+    html_content = """
     <!DOCTYPE html>
-    <html lang="en">
+    <html>
     <head>
         <meta charset="UTF-8">
-        <title>PegePay QR Payment</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Loading...</title>
 
         <style>
-            body {{
+            body {
                 margin: 0;
-                background: #ffffff;
-                font-family: Arial, sans-serif;
-                overflow: hidden; /* 🚫 no scrolling */
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-            }}
+                background: white;
+                font-family: Arial;
+            }
 
-            .iframe-container {{
-                width: 100vw;
-                height: 65vh;
-                overflow: hidden;
+            iframe {
+                width: 100%;
+                height: 100vh;
+                border: none;
+            }
+
+            .loader {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: white;
                 display: flex;
                 justify-content: center;
-                align-items: flex-start;
-                background: white;
-            }}
+                align-items: center;
+                z-index: 9999;
+                flex-direction: column;
+            }
 
-            .iframe-container iframe {{
-             width: 1080px;   /* keep original width */
-             height: 1400px;  /* keep original height */
-             border: none;
-         
-             transform: scale(2.5) translateX(-55%) translateY(-20%);
-             transform-origin: top left;
-
-            }}
-
-            .button-container {{
-             position: fixed;
-             bottom: 300px;
-             left: 50%;
-             transform: translateX(-50%);
-             z-index: 999;
-            }}
-
-            button {{
-                width: 400px;
+            .spinner {
+                width: 80px;
                 height: 80px;
+                border: 8px solid #eee;
+                border-top: 8px solid #0359d2;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+            }
+
+            .text {
+                margin-top: 20px;
                 font-size: 28px;
                 font-weight: bold;
-                color: white;
-                background-color: red;
-                border: none;
-                border-radius: 10px;
-                cursor: pointer;
-            }}
+                color: #0359d2;
+            }
 
-            button:active {{
-                background-color: darkred;
-            }}
+            @keyframes spin {
+                100% { transform: rotate(360deg); }
+            }
         </style>
     </head>
 
     <body>
 
-        <div class="iframe-container">
-            <iframe src="{iframe_url}" allowfullscreen></iframe>
-        </div>
+    <div class="loader" id="loader">
+      <div class="spinner"></div>
+      <div class="text">Loading QR Payment...</div>
+    </div>
 
-        <div class="button-container">
-            <button onclick="cancelPayment()">Batal / Cancel</button>
-        </div>
+    <iframe id="qrFrame"></iframe>
 
-        <script>
-    function cancelPayment() {{
-        // ❌ window.close() won't work
-        if (window.flutter_inappwebview) {{
-            // for webview_flutter, optional
-        }}
-        // Send message to Flutter via custom URL scheme
+    <script>
+      const iframeUrl = new URLSearchParams(window.location.search).get("iframe_url");
+      const iframe = document.getElementById("qrFrame");
+
+      iframe.src = iframeUrl;
+
+      iframe.onload = () => {
+        document.getElementById("loader").style.display = "none";
+      };
+
+      setTimeout(() => {
+        document.querySelector(".text").innerText = "Still loading... please wait";
+      }, 5000);
+
+      function cancelPayment() {
         window.location.href = "app://cancelPayment";
-    }}
-        </script>
+      }
+    </script>
 
     </body>
     </html>
     """
+
     return HTMLResponse(content=html_content)
