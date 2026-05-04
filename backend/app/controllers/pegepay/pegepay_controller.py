@@ -461,27 +461,70 @@ def get_all_orders(db: Session = Depends(get_db)):
 @router.get("/iframe-wrapper", response_class=HTMLResponse)
 def iframe_wrapper(iframe_url: str):
 
-    html_content = """
+    html_content = f"""
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <title>Loading...</title>
+        <title>PegePay QR Payment</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
         <style>
-            body {
+            body {{
                 margin: 0;
+                background: #ffffff;
+                font-family: Arial, sans-serif;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }}
+
+            .iframe-container {{
+                width: 100vw;
+                height: 65vh;
+                overflow: hidden;
+                display: flex;
+                justify-content: center;
+                align-items: flex-start;
                 background: white;
-                font-family: Arial;
-            }
+            }}
 
-            iframe {
-                width: 100%;
-                height: 100vh;
+            .iframe-container iframe {{
+                width: 1080px;
+                height: 1400px;
                 border: none;
-            }
 
-            .loader {
+                transform: scale(2.5) translateX(-55%) translateY(-20%);
+                transform-origin: top left;
+            }}
+
+            .button-container {{
+                position: fixed;
+                bottom: 300px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 999;
+            }}
+
+            button {{
+                width: 400px;
+                height: 80px;
+                font-size: 28px;
+                font-weight: bold;
+                color: white;
+                background-color: red;
+                border: none;
+                border-radius: 10px;
+                cursor: pointer;
+            }}
+
+            button:active {{
+                background-color: darkred;
+            }}
+
+            /* ================= LOADING OVERLAY ================= */
+            .loader {{
                 position: fixed;
                 top: 0;
                 left: 0;
@@ -491,59 +534,71 @@ def iframe_wrapper(iframe_url: str):
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                z-index: 9999;
                 flex-direction: column;
-            }
+                z-index: 99999;
+            }}
 
-            .spinner {
-                width: 80px;
-                height: 80px;
-                border: 8px solid #eee;
-                border-top: 8px solid #0359d2;
+            .spinner {{
+                width: 90px;
+                height: 90px;
+                border: 10px solid #eee;
+                border-top: 10px solid #0359d2;
                 border-radius: 50%;
                 animation: spin 1s linear infinite;
-            }
+            }}
 
-            .text {
+            .loader-text {{
                 margin-top: 20px;
                 font-size: 28px;
                 font-weight: bold;
                 color: #0359d2;
-            }
+            }}
 
-            @keyframes spin {
-                100% { transform: rotate(360deg); }
-            }
+            @keyframes spin {{
+                100% {{ transform: rotate(360deg); }}
+            }}
         </style>
     </head>
 
     <body>
 
-    <div class="loader" id="loader">
-      <div class="spinner"></div>
-      <div class="text">Loading QR Payment...</div>
-    </div>
+        <!-- 🔥 LOADING SCREEN (ADDED) -->
+        <div class="loader" id="loader">
+            <div class="spinner"></div>
+            <div class="loader-text">Loading QR Payment...</div>
+        </div>
 
-    <iframe id="qrFrame"></iframe>
+        <div class="iframe-container">
+            <iframe id="qrFrame"></iframe>
+        </div>
 
-    <script>
-      const iframeUrl = new URLSearchParams(window.location.search).get("iframe_url");
-      const iframe = document.getElementById("qrFrame");
+        <div class="button-container">
+            <button onclick="cancelPayment()">Batal / Cancel</button>
+        </div>
 
-      iframe.src = iframeUrl;
+        <script>
+            const iframeUrl = "{iframe_url}";
+            const iframe = document.getElementById("qrFrame");
+            const loader = document.getElementById("loader");
 
-      iframe.onload = () => {
-        document.getElementById("loader").style.display = "none";
-      };
+            // start loading iframe
+            iframe.src = iframeUrl;
 
-      setTimeout(() => {
-        document.querySelector(".text").innerText = "Still loading... please wait";
-      }, 5000);
+            // hide loader when loaded
+            iframe.onload = () => {{
+                loader.style.display = "none";
+            }};
 
-      function cancelPayment() {
-        window.location.href = "app://cancelPayment";
-      }
-    </script>
+            // fallback if slow network
+            setTimeout(() => {{
+                document.querySelector(".loader-text").innerText =
+                    "Still loading QR... please wait";
+            }}, 3000);
+
+            function cancelPayment() {{
+                window.location.href = "app://cancelPayment";
+            }}
+        </script>
 
     </body>
     </html>
