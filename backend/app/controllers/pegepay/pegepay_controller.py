@@ -482,7 +482,7 @@ def iframe_wrapper(iframe_url: str):
 
             .iframe-container {{
                 width: 100vw;
-                height: 100vh;
+                height: 65vh;
                 overflow: hidden;
                 display: flex;
                 justify-content: center;
