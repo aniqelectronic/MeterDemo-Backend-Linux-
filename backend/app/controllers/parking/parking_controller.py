@@ -122,7 +122,7 @@ def extend_parking(db: Session, plate: str, hours: float, terminal: str, transac
         hours=hours,
         amount=calculate_amount(hours),
         transaction_type=transaction_type,
-        Ticket_Overview=TicketOverviewEnum.extend
+        Ticket_Overview=TicketOverviewEnum.extend,
         
         order_no=order_no,
         bank_trx_no=bank_trx_no,
