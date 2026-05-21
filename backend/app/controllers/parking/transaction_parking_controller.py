@@ -63,6 +63,9 @@ def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
         transaction_type= transaction.transaction_type if transaction else "N/A",
         #logo_bytes=LOGO_BYTES
         #logo_path=logo_path
+        order_no=transaction.order_no,
+        bank_trx_no=transaction.bank_trx_no,
+        
     )
 
     pdf_filename = f"receipt_{transaction.ticket_id}.pdf"
@@ -161,6 +164,8 @@ def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
                     </span>
                 </p>
                 <p><b>Transaction Type:</b> {transaction.transaction_type if transaction else "N/A"}</p>
+                <p><b>Order No:</b> {transaction.order_no if transaction and transaction.order_no else "N/A"}</p>
+                <p><b>Bank Transaction No:</b> {transaction.bank_trx_no if transaction and transaction.bank_trx_no else "N/A"}</p>
     
                 <div class="thankyou">Thank you! Drive safely </div>
     
@@ -246,6 +251,8 @@ def get_latest_qr(db: Session = Depends(get_db)):
             transaction_type= tx.transaction_type if tx else "N/A",
             #logo_bytes=LOGO_BYTES
             #logo_path=logo_path
+            order_no=tx.order_no,
+            bank_trx_no=tx.bank_trx_no,
         )
 
         # ✅ Upload the PDF to Azure Blob

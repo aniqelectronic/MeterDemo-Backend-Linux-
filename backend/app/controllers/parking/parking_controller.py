@@ -99,7 +99,9 @@ def extend_parking(db: Session, plate: str, hours: float, terminal: str, transac
             plate,
             hours,
             terminal,
-            transaction_type
+            transaction_type,
+            order_no,
+            bank_trx_no,
         )
 
     # If still active → extend normally
@@ -169,7 +171,7 @@ def pay_parking(parking: ParkingCreate, db: Session = Depends(get_db)):
     active = check_active_parking(db, parking.plate)  
     if active:
         raise HTTPException(status_code=400, detail=f"Parking already active until {active.timeout}")
-    return add_new_parking(db, parking.plate, parking.time_used, parking.terminal, parking.transaction_type)  
+    return add_new_parking(db, parking.plate, parking.time_used, parking.terminal, parking.transaction_type,parking.order_no,parking.bank_trx_no,)  
 
 # ✅ changed path param name from parking_id -> plate
 @router.put("/{plate}/{terminal}/extend", response_model=ParkingResponse)
@@ -177,7 +179,7 @@ def extend(plate: str, terminal: str, extend: ParkingExtend, db: Session = Depen
     """
     Extend an active paid parking.
     """
-    return extend_parking(db, plate, extend.extend_hours, terminal, extend.transaction_type)  
+    return extend_parking(db, plate, extend.extend_hours, terminal, extend.transaction_type, extend.order_no, extend.bank_trx_no)
 
 @router.get("/", response_model=list[ParkingResponse])
 def get_all(db: Session = Depends(get_db)):

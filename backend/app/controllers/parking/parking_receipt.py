@@ -29,6 +29,8 @@ def generate_parking_receipt(
     time_out: datetime.datetime,
     amount: float,
     transaction_type: str,
+    order_no: str = None,
+    bank_trx_no: str = None,
 ):
     """
     Generate a modern parking receipt (PDF bytes) using ReportLab.
@@ -88,6 +90,8 @@ def generate_parking_receipt(
         ("Time Out", time_out.replace(second=0, microsecond=0).strftime("%d/%m/%Y %I:%M %p")),
         ("Transaction Type", transaction_type.capitalize()),
         ("Amount Paid (RM)", f"{amount:.2f}"),
+        ("Order No", order_no if order_no else "N/A"),
+        ("Bank Transaction No", bank_trx_no if bank_trx_no else "N/A"),
     ]
 
     total_rows = len(details) + 1  # header row included
