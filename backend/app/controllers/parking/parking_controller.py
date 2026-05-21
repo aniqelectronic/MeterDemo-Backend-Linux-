@@ -51,7 +51,7 @@ def check_active_parking(db: Session, plate: str):
     return None
 
 
-def add_new_parking(db: Session, plate: str, time_used: float, terminal: str, transaction_type: str):
+def add_new_parking(db: Session, plate: str, time_used: float, terminal: str, transaction_type: str    ,order_no: str = None, bank_trx_no: str = None,):
     now = malaysia_now()
     timeout = now + timedelta(hours=time_used)
     amount=calculate_amount(time_used) 
@@ -79,14 +79,17 @@ def add_new_parking(db: Session, plate: str, time_used: float, terminal: str, tr
         hours=time_used,
         amount=amount,
         transaction_type = transaction_type,
-        Ticket_Overview= TicketOverviewEnum.new
+        Ticket_Overview= TicketOverviewEnum.new,
+        
+        order_no=order_no,
+        bank_trx_no=bank_trx_no,
     )
     db.add(transaction)
     db.commit()
     db.refresh(transaction)
     return new_parking
 
-def extend_parking(db: Session, plate: str, hours: float, terminal: str, transaction_type: str):
+def extend_parking(db: Session, plate: str, hours: float, terminal: str, transaction_type: str, order_no: str = None, bank_trx_no: str = None):
     active = check_active_parking(db, plate)
 
     # 🔥 OPTION C: If NOT active = expired → treat as NEW PARKING
@@ -120,6 +123,9 @@ def extend_parking(db: Session, plate: str, hours: float, terminal: str, transac
         amount=calculate_amount(hours),
         transaction_type=transaction_type,
         Ticket_Overview=TicketOverviewEnum.extend
+        
+        order_no=order_no,
+        bank_trx_no=bank_trx_no,
     )
     db.add(transaction)
     db.commit()

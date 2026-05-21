@@ -17,6 +17,8 @@ class TransactionResponse(BaseModel):
     amount: float
     transaction_type: str
     Ticket_Overview: TicketOverviewEnum
+    order_no: str | None = None
+    bank_trx_no: str | None = None
     
     
     class Config:
@@ -31,6 +33,8 @@ class TransactionCreate(BaseModel):
     amount: float
     transaction_type: str
     Ticket_Overview: TicketOverviewEnum
+    order_no: str | None = None
+    bank_trx_no: str | None = None
 
     class Config:
         from_attributes = True 

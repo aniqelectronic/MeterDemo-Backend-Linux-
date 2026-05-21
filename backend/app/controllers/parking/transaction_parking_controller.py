@@ -392,6 +392,8 @@ def get_latest_qr(db: Session = Depends(get_db)):
               <p><b>Time In:</b> {parking.timein.strftime("%d/%m/%Y %H:%M %p") if parking and parking.timein else "N/A"}</p>
               <p><b>Time Out:</b> {parking.timeout.strftime("%d/%m/%Y %H:%M %p") if parking and parking.timeout else "N/A"}</p>
               <p><b>Transaction Type:</b> <span>{tx.transaction_type if tx else "N/A"}</span></p>
+              <p><b>Order No:</b> <span>{tx.order_no if tx and tx.order_no else "N/A"}</span></p>
+              <p><b>Bank Transaction No:</b> <span>{tx.bank_trx_no if tx and tx.bank_trx_no else "N/A"}</span></p>
             </div>
   
             <div class="amount">Total Paid: <span>RM {tx.amount:.2f}</span></div>
@@ -459,6 +461,8 @@ def get_latest_receipt_by_plate(plate: str, db: Session = Depends(get_db)):
         "hours": transaction.hours,
         "amount": transaction.amount,
         "transaction_type": transaction.transaction_type,
+        "order_no": transaction.order_no,
+        "bank_trx_no": transaction.bank_trx_no,
         "time_in": parking.timein if parking else None, 
         "time_out": parking.timeout if parking else None,
     }

@@ -20,3 +20,6 @@ class TransactionParking(Base):
     amount = Column(Float, nullable=False)
     transaction_type = Column(String(50), nullable=False)
     Ticket_Overview = Column(Enum(TicketOverviewEnum), nullable=False) 
+    
+    order_no = Column(String(50), nullable=True)
+    bank_trx_no = Column(String(100), nullable=True)

@@ -13,10 +13,14 @@ class ParkingCreate(BaseModel):
     time_used: float
     terminal: str
     transaction_type : str
+    order_no: str | None = None
+    bank_trx_no: str | None = None
 
 class ParkingExtend(BaseModel):
     extend_hours: float
     transaction_type : str
+    order_no: str | None = None
+    bank_trx_no: str | None = None
 
 # -------------------------
 # Response Schema
