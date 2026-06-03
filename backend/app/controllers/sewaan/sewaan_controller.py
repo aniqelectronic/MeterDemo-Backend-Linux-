@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 from datetime import datetime
 from io import BytesIO
 import qrcode
+from app.utils.blob_upload import upload_to_blob 
 
 # Import your sewaan receipt generator
 from app.controllers.sewaan.sewaan_receipt_bentong import generate_sewaan_receipt_bentong
