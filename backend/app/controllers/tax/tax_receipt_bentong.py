@@ -11,18 +11,33 @@ import os
 # LOGO PRELOAD
 # =========================================================
 
-MAIN_LOGO = None
-MAIN_LOGO_PATH = "app/resources/images/City_Car_Park_logo.png"
+BENTONG_LOGO = None
+BENTONG_LOGO_PATH = "app/resources/images/majlisbentong.png"
+
+COMPANY_LOGO = None
+COMPANY_LOGO_PATH = "app/resources/images/City_Car_Park_logo.png"
+
 
 try:
-    if os.path.exists(MAIN_LOGO_PATH):
-        with open(MAIN_LOGO_PATH, "rb") as f:
-            MAIN_LOGO = ImageReader(BytesIO(f.read()))
-        print("[INFO] Main logo preloaded successfully.")
+    if os.path.exists(BENTONG_LOGO_PATH):
+        with open(BENTONG_LOGO_PATH, "rb") as f:
+            BENTONG_LOGO = ImageReader(BytesIO(f.read()))
+        print("[INFO] Bentong logo preloaded successfully.")
     else:
-        print(f"[WARN] Main logo not found at: {MAIN_LOGO_PATH}")
+        print(f"[WARN] Bentong logo not found at: {BENTONG_LOGO_PATH}")
 except Exception as e:
-    print(f"[WARN] Failed to load main logo: {e}")
+    print(f"[WARN] Failed to load Bentong logo: {e}")
+
+
+try:
+    if os.path.exists(COMPANY_LOGO_PATH):
+        with open(COMPANY_LOGO_PATH, "rb") as f:
+            COMPANY_LOGO = ImageReader(BytesIO(f.read()))
+        print("[INFO] Company logo preloaded successfully.")
+    else:
+        print(f"[WARN] Company logo not found at: {COMPANY_LOGO_PATH}")
+except Exception as e:
+    print(f"[WARN] Failed to load company logo: {e}")
 
 
 # =========================================================
@@ -68,6 +83,116 @@ def _draw_wrapped_text(
     return y
 
 
+def _draw_image_keep_ratio(c, img, x, y, max_width, max_height):
+    try:
+        img_width, img_height = img.getSize()
+        ratio = min(max_width / img_width, max_height / img_height)
+        draw_width = img_width * ratio
+        draw_height = img_height * ratio
+
+        c.drawImage(
+            img,
+            x,
+            y + (max_height - draw_height) / 2,
+            width=draw_width,
+            height=draw_height,
+            mask="auto",
+        )
+    except Exception as e:
+        print(f"[WARN] Failed to draw image: {e}")
+
+
+def _draw_page_header(c, width, height, primary_blue, secondary_blue, light_blue):
+    header_height = 150
+
+    # Main blue header
+    c.setFillColor(primary_blue)
+    c.rect(0, height - header_height, width, header_height, fill=True, stroke=False)
+
+    # Light blue strip
+    c.setFillColor(light_blue)
+    c.rect(0, height - 15, width, 15, fill=True, stroke=False)
+
+    # Bottom blue strip
+    c.setFillColor(secondary_blue)
+    c.rect(0, height - header_height, width, 45, fill=True, stroke=False)
+
+    # Bentong logo top left
+    if BENTONG_LOGO:
+        _draw_image_keep_ratio(
+            c,
+            BENTONG_LOGO,
+            35,
+            height - 115,
+            80,
+            80,
+        )
+
+    # Company logo top right
+    if COMPANY_LOGO:
+        _draw_image_keep_ratio(
+            c,
+            COMPANY_LOGO,
+            width - 150,
+            height - 108,
+            110,
+            65,
+        )
+
+    # Center text
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 15)
+    c.drawCentredString(width / 2, height - 50, "MAJLIS PERBANDARAN BENTONG")
+
+    c.setFont("Helvetica", 9)
+    c.drawCentredString(
+        width / 2,
+        height - 67,
+        "Jalan Ketari, 28700 Bentong, Pahang Darul Makmur",
+    )
+    c.drawCentredString(width / 2, height - 82, "Assessment Tax Receipt")
+    c.drawCentredString(width / 2, height - 97, "Powered by Vista Smart Kiosk")
+
+
+def _draw_table_header(c, y, table_left, table_right, table_width, secondary_blue):
+    c.setFillColor(secondary_blue)
+    c.roundRect(table_left, y, table_width, 34, 12, fill=True, stroke=False)
+
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(table_left + 18, y + 11, "#")
+    c.drawString(table_left + 55, y + 11, "Item")
+    c.drawRightString(table_right - 18, y + 11, "Amount")
+
+
+def _draw_footer(c, width, primary_blue, grey_text):
+    c.setStrokeColor(colors.HexColor("#D9E8FF"))
+    c.line(45, 82, width - 45, 82)
+
+    if BENTONG_LOGO:
+        _draw_image_keep_ratio(c, BENTONG_LOGO, 50, 25, 35, 35)
+
+    if COMPANY_LOGO:
+        _draw_image_keep_ratio(c, COMPANY_LOGO, width - 95, 25, 50, 35)
+
+    c.setFillColor(primary_blue)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawCentredString(width / 2, 62, "Majlis Perbandaran Bentong")
+
+    c.setFillColor(grey_text)
+    c.setFont("Helvetica", 8)
+    c.drawCentredString(
+        width / 2,
+        48,
+        "Jalan Ketari, 28700 Bentong, Pahang Darul Makmur",
+    )
+    c.drawCentredString(
+        width / 2,
+        34,
+        "Telephone : 04-5497555 | Application : TIP BENTONG",
+    )
+
+
 # =========================================================
 # TAX RECEIPT GENERATOR - PBT BENTONG
 # =========================================================
@@ -79,26 +204,6 @@ def generate_tax_receipt_bentong(
     order_no: str = None,
     bank_trx_no: str = None,
 ):
-    """
-    Generate PBT Bentong Assessment Tax receipt PDF bytes.
-
-    tax_items example:
-    [
-        {
-            "account_number": "T0602002856401",
-            "owner_name": "ZALINA BINTI MD AKHIR",
-            "property_address": "64, TAMAN PERDANA RAYA, 28600 KARAK",
-            "amount": 273.60
-        },
-        {
-            "account_number": "T0602002856402",
-            "owner_name": "ALI BIN ABU",
-            "property_address": "NO 12, TAMAN BENTONG, 28700 BENTONG",
-            "amount": 150.00
-        }
-    ]
-    """
-
     if tax_items is None:
         tax_items = []
 
@@ -106,67 +211,14 @@ def generate_tax_receipt_bentong(
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    dark_blue = colors.HexColor("#083B73")
-    light_blue = colors.HexColor("#12A8E0")
-    green = colors.HexColor("#6DBB2F")
+    primary_blue = colors.HexColor("#003B8E")
+    secondary_blue = colors.HexColor("#0057D9")
+    light_blue = colors.HexColor("#0A84FF")
+    soft_blue = colors.HexColor("#EDF4FF")
     grey_text = colors.HexColor("#666666")
     dark_text = colors.HexColor("#222222")
 
-    # =====================================================
-    # HEADER BACKGROUND
-    # =====================================================
-
-    header_height = 145
-
-    c.setFillColor(light_blue)
-    c.rect(0, height - header_height, width, header_height, fill=True, stroke=False)
-
-    c.setFillColor(green)
-    c.roundRect(
-        width * 0.35,
-        height - header_height - 10,
-        width * 0.75,
-        65,
-        35,
-        fill=True,
-        stroke=False,
-    )
-
-    # =====================================================
-    # LOGO
-    # =====================================================
-
-    if MAIN_LOGO:
-        try:
-            img_width, img_height = MAIN_LOGO.getSize()
-            display_width = 80
-            display_height = display_width * img_height / img_width
-
-            c.drawImage(
-                MAIN_LOGO,
-                45,
-                height - 105,
-                width=display_width,
-                height=display_height,
-                mask="auto",
-            )
-        except Exception as e:
-            print(f"[WARN] Failed to draw logo: {e}")
-
-    # =====================================================
-    # COUNCIL INFO
-    # =====================================================
-
-    c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 9)
-    c.drawString(145, height - 50, "Majlis Perbandaran Bentong")
-
-    c.setFont("Helvetica", 8)
-    c.drawString(145, height - 65, "Jalan Ketari")
-    c.drawString(145, height - 78, "28700 Bentong")
-    c.drawString(145, height - 91, "Pahang Darul Makmur")
-    c.drawString(145, height - 112, "Telephone : 04-5497555")
-    c.drawString(145, height - 125, "Application : TIP Bentong")
+    _draw_page_header(c, width, height, primary_blue, secondary_blue, light_blue)
 
     # =====================================================
     # TITLE
@@ -174,13 +226,13 @@ def generate_tax_receipt_bentong(
 
     y = height - 195
 
-    c.setFillColor(dark_text)
+    c.setFillColor(primary_blue)
     c.setFont("Helvetica-Bold", 26)
     c.drawString(45, y, "Receipt")
 
     c.setFont("Helvetica-Bold", 10)
-    c.setFillColor(grey_text)
-    c.drawString(150, y + 4, f"#{order_no}")
+    c.setFillColor(secondary_blue)
+    c.drawString(150, y + 4, f"#{order_no or '-'}")
 
     c.setFont("Helvetica", 10)
     c.setFillColor(grey_text)
@@ -203,14 +255,7 @@ def generate_tax_receipt_bentong(
 
     y -= 105
 
-    c.setFillColor(dark_blue)
-    c.roundRect(table_left, y, table_width, 34, 15, fill=True, stroke=False)
-
-    c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(table_left + 18, y + 11, "#")
-    c.drawString(table_left + 55, y + 11, "Item")
-    c.drawRightString(table_right - 18, y + 11, "Amount")
+    _draw_table_header(c, y, table_left, table_right, table_width, secondary_blue)
 
     y -= 32
 
@@ -229,30 +274,36 @@ def generate_tax_receipt_bentong(
         total_amount += amount
 
         if y < 165:
+            _draw_footer(c, width, primary_blue, grey_text)
             c.showPage()
-            y = height - 80
 
-            c.setFillColor(dark_blue)
-            c.roundRect(table_left, y, table_width, 34, 15, fill=True, stroke=False)
+            _draw_page_header(c, width, height, primary_blue, secondary_blue, light_blue)
 
-            c.setFillColor(colors.white)
-            c.setFont("Helvetica-Bold", 10)
-            c.drawString(table_left + 18, y + 11, "#")
-            c.drawString(table_left + 55, y + 11, "Item")
-            c.drawRightString(table_right - 18, y + 11, "Amount")
-
+            y = height - 190
+            _draw_table_header(c, y, table_left, table_right, table_width, secondary_blue)
             y -= 32
 
-        c.setFillColor(colors.white)
-        c.rect(table_left, y - 95, table_width, 95, fill=True, stroke=False)
+        # Item background
+        c.setFillColor(soft_blue if index % 2 == 0 else colors.white)
+        c.roundRect(
+            table_left,
+            y - 95,
+            table_width,
+            95,
+            8,
+            fill=True,
+            stroke=False,
+        )
 
         c.setFillColor(dark_text)
         c.setFont("Helvetica", 10)
         c.drawString(table_left + 18, y - 20, str(index))
 
+        c.setFillColor(primary_blue)
         c.setFont("Helvetica-Bold", 11)
         c.drawString(table_left + 55, y - 20, "Assessment Tax")
 
+        c.setFillColor(dark_text)
         c.setFont("Helvetica", 9)
 
         info_y = y - 38
@@ -278,8 +329,8 @@ def generate_tax_receipt_bentong(
             line_height=11,
         )
 
-        c.setFillColor(dark_text)
-        c.setFont("Helvetica", 10)
+        c.setFillColor(primary_blue)
+        c.setFont("Helvetica-Bold", 10)
         c.drawRightString(table_right - 18, y - 20, f"RM {_format_money(amount)}")
 
         y -= 105
@@ -289,15 +340,20 @@ def generate_tax_receipt_bentong(
     # =====================================================
 
     if y < 120:
+        _draw_footer(c, width, primary_blue, grey_text)
         c.showPage()
-        y = height - 80
 
-    c.setFillColor(dark_blue)
-    c.roundRect(table_left, y - 10, table_width, 34, 15, fill=True, stroke=False)
+        _draw_page_header(c, width, height, primary_blue, secondary_blue, light_blue)
+        y = height - 190
+
+    c.setFillColor(primary_blue)
+    c.roundRect(table_left, y - 10, table_width, 36, 12, fill=True, stroke=False)
 
     c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 11)
-    c.drawRightString(table_right - 18, y + 1, f"RM {_format_money(total_amount)}")
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(table_left + 18, y + 2, "Total")
+
+    c.drawRightString(table_right - 18, y + 2, f"RM {_format_money(total_amount)}")
 
     y -= 60
 
@@ -317,14 +373,7 @@ def generate_tax_receipt_bentong(
     # FOOTER
     # =====================================================
 
-    c.setStrokeColor(colors.HexColor("#DDDDDD"))
-    c.line(45, 80, width - 45, 80)
-
-    c.setFillColor(grey_text)
-    c.setFont("Helvetica", 8)
-    c.drawCentredString(width / 2, 60, "Majlis Perbandaran Bentong")
-    c.drawCentredString(width / 2, 47, "Jalan Ketari, 28700 Bentong, Pahang Darul Makmur")
-    c.drawCentredString(width / 2, 34, "Telephone : 04-5497555 | Application : Vista Smart Kiosk")
+    _draw_footer(c, width, primary_blue, grey_text)
 
     c.showPage()
     c.save()
@@ -340,9 +389,8 @@ def generate_tax_receipt_bentong(
 
 if __name__ == "__main__":
     pdf_bytes = generate_tax_receipt_bentong(
-        receipt_no="01B4P3VDXW",
         paid_date=datetime.datetime.now(),
-        payment_method="FPX",
+        payment_method="DuitNow QR",
         order_no="ORD123456",
         bank_trx_no="BANK987654",
         tax_items=[
