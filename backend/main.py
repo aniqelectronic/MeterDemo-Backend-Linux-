@@ -8,6 +8,7 @@ from app.controllers.compound import compound_controller
 from app.controllers.tax import tax_controller
 from app.controllers.licenses import licenses_controller
 from app.controllers.pegepay import pegepay_controller
+from app.controllers.sewaan import sewaan_controller
 
 
 
@@ -37,6 +38,7 @@ app.include_router(compound_controller.router)
 app.include_router(tax_controller.router)
 app.include_router(licenses_controller.router)
 app.include_router(pegepay_controller.router)
+app.include_router(sewaan_controller.router)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
