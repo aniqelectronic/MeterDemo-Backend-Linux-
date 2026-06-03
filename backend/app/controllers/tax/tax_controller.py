@@ -11,6 +11,15 @@ from app.schema.tax.tax_schema import CukaiTaksiran, Owner, Property
 from app.controllers.tax.tax_receipt import generate_multi_tax_pdf
 from app.utils.blob_upload import upload_to_blob 
 
+
+import html
+from datetime import datetime
+from io import BytesIO
+
+import qrcode
+
+from app.controllers.tax.tax_receipt_bentong import generate_tax_receipt_bentong
+
 router = APIRouter(prefix="/tax", tags=["Cukai Taksiran"])
 
 # --- Create new owner ---
@@ -112,6 +121,343 @@ def renew_tax(bill_no: str, db: Session = Depends(get_db), extra_days: int = 180
     db.refresh(tax)
     return tax
 
+
+def generate_tax_receipt_bentong_html(
+    paid_date: datetime,
+    payment_method: str,
+    tax_items: list,
+    pdf_url: str,
+    order_no: str,
+    bank_trx_no: str = None,
+):
+    total_amount = sum(float(item.get("amount", 0) or 0) for item in tax_items)
+
+    rows_html = ""
+
+    for index, item in enumerate(tax_items, start=1):
+        account_number = html.escape(str(item.get("account_number", "-")))
+        owner_name = html.escape(str(item.get("owner_name", "-")))
+        property_address = html.escape(str(item.get("property_address", "-")))
+        amount = float(item.get("amount", 0) or 0)
+
+        rows_html += f"""
+        <tr>
+            <td class="no">{index}</td>
+            <td>
+                <div class="item-title">Assessment Tax</div>
+                <div>Account Number: {account_number}</div>
+                <div>Owner Name: {owner_name}</div>
+                <div>Property Address:</div>
+                <div class="address">{property_address}</div>
+            </td>
+            <td class="amount">RM {amount:,.2f}</td>
+        </tr>
+        """
+
+    bank_html = ""
+    if bank_trx_no:
+        bank_html = f"""
+        <p><strong>Bank Transaction No:</strong> {html.escape(str(bank_trx_no))}</p>
+        """
+
+    return f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bentong Tax Receipt</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+        body {{
+            margin: 0;
+            padding: 30px;
+            background: #eef3f8;
+            font-family: Arial, Helvetica, sans-serif;
+            color: #222;
+        }}
+
+        .receipt {{
+            max-width: 820px;
+            margin: auto;
+            background: white;
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.10);
+        }}
+
+        .header {{
+            background: linear-gradient(135deg, #12A8E0, #083B73);
+            color: white;
+            padding: 30px 40px;
+        }}
+
+        .header h2 {{
+            margin: 0 0 8px 0;
+            font-size: 22px;
+        }}
+
+        .header p {{
+            margin: 3px 0;
+            font-size: 13px;
+        }}
+
+        .content {{
+            padding: 35px 40px;
+        }}
+
+        .title-row {{
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            border-bottom: 1px solid #e5e5e5;
+            padding-bottom: 22px;
+            flex-wrap: wrap;
+        }}
+
+        h1 {{
+            margin: 0;
+            font-size: 34px;
+        }}
+
+        .receipt-no {{
+            color: #666;
+            font-weight: bold;
+            margin-top: 5px;
+        }}
+
+        .meta p {{
+            margin: 6px 0;
+            font-size: 14px;
+            color: #444;
+        }}
+
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 30px;
+        }}
+
+        th {{
+            background: #083B73;
+            color: white;
+            padding: 13px;
+            font-size: 14px;
+            text-align: left;
+        }}
+
+        td {{
+            padding: 16px 13px;
+            border-bottom: 1px solid #eeeeee;
+            vertical-align: top;
+            font-size: 14px;
+        }}
+
+        .no {{
+            width: 45px;
+        }}
+
+        .item-title {{
+            font-weight: bold;
+            font-size: 15px;
+            margin-bottom: 8px;
+        }}
+
+        .address {{
+            margin-top: 3px;
+            color: #444;
+            line-height: 1.4;
+        }}
+
+        .amount {{
+            text-align: right;
+            white-space: nowrap;
+            font-weight: bold;
+        }}
+
+        .total {{
+            background: #083B73;
+            color: white;
+            margin-top: 25px;
+            padding: 16px 20px;
+            border-radius: 12px;
+            text-align: right;
+            font-size: 22px;
+            font-weight: bold;
+        }}
+
+        .note {{
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+            margin-top: 25px;
+            line-height: 1.5;
+        }}
+
+        .download {{
+            text-align: center;
+            margin-top: 30px;
+        }}
+
+        .download a {{
+            display: inline-block;
+            background: #27ae60;
+            color: white;
+            padding: 14px 26px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-size: 17px;
+            font-weight: bold;
+        }}
+
+        .footer {{
+            background: #f6f8fb;
+            text-align: center;
+            padding: 22px;
+            color: #666;
+            font-size: 13px;
+            line-height: 1.5;
+        }}
+    </style>
+</head>
+
+<body>
+    <div class="receipt">
+        <div class="header">
+            <h2>Majlis Perbandaran Bentong</h2>
+            <p>Jalan Ketari</p>
+            <p>28700 Bentong, Pahang Darul Makmur</p>
+            <p>Telephone : 04-5497555</p>
+            <p>Application : TIP Bentong</p>
+        </div>
+
+        <div class="content">
+            <div class="title-row">
+                <div>
+                    <h1>Receipt</h1>
+                    <div class="receipt-no">#{html.escape(str(order_no))}</div>
+                </div>
+
+                <div class="meta">
+                    <p><strong>Paid at:</strong> {paid_date.strftime("%d %b %Y")}</p>
+                    <p><strong>Payment Method:</strong> {html.escape(str(payment_method))}</p>
+                    {bank_html}
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Item</th>
+                        <th style="text-align:right;">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows_html}
+                </tbody>
+            </table>
+
+            <div class="total">
+                RM {total_amount:,.2f}
+            </div>
+
+            <div class="note">
+                Please be informed that for customers making payments, the updating of account balances will be processed on the following day.
+            </div>
+
+            <div class="download">
+                <a href="{pdf_url}" target="_blank" download>Download PDF Receipt</a>
+            </div>
+        </div>
+
+        <div class="footer">
+            Majlis Perbandaran Bentong<br>
+            Jalan Ketari, 28700 Bentong, Pahang Darul Makmur<br>
+            Telephone : 04-5497555 | Application : TIP Bentong
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+
+@router.post("/receipt/qr/bentong")
+def generate_bentong_tax_receipt(payload: dict):
+    order_no = payload.get("order_no")
+    paid_date_raw = payload.get("paid_date")
+    payment_method = payload.get("payment_method", "N/A")
+    bank_trx_no = payload.get("bank_trx_no")
+    tax_items = payload.get("tax_items", [])
+
+    if not order_no:
+        raise HTTPException(status_code=400, detail="Missing order_no")
+
+    if not tax_items:
+        raise HTTPException(status_code=400, detail="No tax items provided")
+
+    for index, item in enumerate(tax_items, start=1):
+        if not item.get("account_number"):
+            raise HTTPException(status_code=400, detail=f"Missing account_number at item {index}")
+        if not item.get("owner_name"):
+            raise HTTPException(status_code=400, detail=f"Missing owner_name at item {index}")
+        if not item.get("property_address"):
+            raise HTTPException(status_code=400, detail=f"Missing property_address at item {index}")
+        if item.get("amount") is None:
+            raise HTTPException(status_code=400, detail=f"Missing amount at item {index}")
+
+    if paid_date_raw:
+        paid_date = datetime.fromisoformat(paid_date_raw)
+    else:
+        paid_date = datetime.now()
+
+    pdf_bytes = generate_tax_receipt_bentong(
+        paid_date=paid_date,
+        payment_method=payment_method,
+        tax_items=tax_items,
+        order_no=order_no,
+        bank_trx_no=bank_trx_no,
+    )
+
+    pdf_filename = f"bentong_tax_receipt_{order_no}.pdf"
+
+    pdf_url = upload_to_blob(
+        pdf_filename,
+        pdf_bytes,
+        content_type="application/pdf",
+    )
+
+    html_receipt = generate_tax_receipt_bentong_html(
+        paid_date=paid_date,
+        payment_method=payment_method,
+        tax_items=tax_items,
+        pdf_url=pdf_url,
+        order_no=order_no,
+        bank_trx_no=bank_trx_no,
+    )
+
+    html_filename = f"bentong_tax_receipt_{order_no}.html"
+
+    html_url = upload_to_blob(
+        html_filename,
+        html_receipt.encode("utf-8"),
+        content_type="text/html",
+    )
+
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+    )
+
+    qr.add_data(html_url)
+    qr.make(fit=True)
+
+    img = qr.make_image(fill_color="black", back_color="white")
+
+    buf = BytesIO()
+    img.save(buf, "PNG")
+    buf.seek(0)
+
+    return StreamingResponse(buf, media_type="image/png")
 
 @router.post("/receipt/qr/multi")
 def generate_multi_tax_receipt(payload: dict, db: Session = Depends(get_db)):
@@ -367,3 +713,8 @@ def pay_multiple_taxes(
             for t in updated_taxes
         ]
     }
+    
+    
+    
+    
+    
