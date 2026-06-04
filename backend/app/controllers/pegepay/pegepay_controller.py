@@ -60,7 +60,7 @@ def get_pegepay_token(db: Session):
 @router.get("/qr-guide")
 def qr_guide():
     return FileResponse(
-        "app/resources/images/qr_guide.png",
+        "app/resources/images/qr_guide2.png",
         media_type="image/png"
     )
 
