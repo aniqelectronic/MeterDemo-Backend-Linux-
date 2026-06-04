@@ -510,7 +510,7 @@ def iframe_wrapper(iframe_url: str):
 
             .button-container {{
                 position: fixed;
-                bottom: 300px;
+                bottom: 50px;
                 left: 50%;
                 transform: translateX(-50%);
                 z-index: 999;
@@ -534,7 +534,7 @@ def iframe_wrapper(iframe_url: str):
             
             .promo-container {{
                 position: fixed;
-                bottom: 430px;
+                bottom: 180px;
                 left: 50%;
                 transform: translateX(-50%);
                 z-index: 998;
