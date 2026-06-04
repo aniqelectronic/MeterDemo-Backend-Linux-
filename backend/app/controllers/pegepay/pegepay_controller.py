@@ -1,11 +1,12 @@
 from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 import requests, time
 from sqlalchemy.orm import Session
 from app.models.pegepay.pegepay_model import OrderCreateRequest, OrderStatusRequest
 from app.db.database import get_db
 from app.schema.pegepay.pegepay_schema import PegepayOrder, PegepayToken
 from app.utils.config import refresh_token
+
 
 router = APIRouter(prefix="/pegepay", tags=["Pegepay"])
 
@@ -54,6 +55,14 @@ def get_pegepay_token(db: Session):
     db.refresh(token_entry)
 
     return access_token
+
+
+@router.get("/qr-guide")
+def qr_guide():
+    return FileResponse(
+        "app/resources/images/qr_guide.png",
+        media_type="image/png"
+    )
 
 
 # # ---------------------- Create Order ----------------------
@@ -587,7 +596,7 @@ def iframe_wrapper(iframe_url: str):
         </div>
         
         <div class="promo-container">
-                <img src="app/resources/images/qr_guide.png" alt="QR Guide">
+                <img src="/pegepay/qr-guide" alt="QR Guide">
         </div>
 
         <div class="button-container">
