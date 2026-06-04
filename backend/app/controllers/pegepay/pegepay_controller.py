@@ -504,7 +504,7 @@ def iframe_wrapper(iframe_url: str):
                 height: 1400px;
                 border: none;
 
-                transform: scale(2.5) translateX(-55%) translateY(-20%);
+                transform: scale(2.0) translateX(-55%) translateY(-20%);
                 transform-origin: top left;
             }}
 
