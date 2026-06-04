@@ -522,6 +522,20 @@ def iframe_wrapper(iframe_url: str):
             button:active {{
                 background-color: darkred;
             }}
+            
+            .promo-container {{
+                position: fixed;
+                bottom: 430px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 998;
+            }}
+
+            .promo-container img {{
+                width: 900px;
+                max-width: 95vw;
+                border-radius: 15px;
+            }}
 
             /* ================= LOADING OVERLAY ================= */
             .loader {{
@@ -570,6 +584,10 @@ def iframe_wrapper(iframe_url: str):
 
         <div class="iframe-container">
             <iframe id="qrFrame"></iframe>
+        </div>
+        
+        <div class="promo-container">
+                <img src="/resources/images/qr_guide.png" alt="QR Guide">
         </div>
 
         <div class="button-container">
