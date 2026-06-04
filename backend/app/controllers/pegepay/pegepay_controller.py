@@ -587,7 +587,7 @@ def iframe_wrapper(iframe_url: str):
         </div>
         
         <div class="promo-container">
-                <img src="/resources/images/qr_guide.png" alt="QR Guide">
+                <img src="app/resources/images/qr_guide.png" alt="QR Guide">
         </div>
 
         <div class="button-container">
