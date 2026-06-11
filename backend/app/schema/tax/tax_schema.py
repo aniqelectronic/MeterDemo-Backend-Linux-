@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text
 from datetime import datetime
 from app.db.database import Base
 from sqlalchemy.orm import relationship
@@ -79,3 +79,24 @@ class CukaiTaksiran(Base):
     # relationships
     property = relationship("Property", back_populates="taxes")
     owner = relationship("Owner", back_populates="taxes")
+    
+
+class PaymentUpdatesCukaiTaksiranBentong(Base):
+    __tablename__ = "payment_updates_cukaitaksiran_bentong"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    order_no = Column(String(100), index=True)
+
+    no_pendaftaran = Column(String(100), index=True)
+    account_number = Column(String(100), index=True)
+
+    owner_name = Column(String(255))
+    property_address = Column(Text)
+
+    amount = Column(Float)
+
+    payment_method = Column(String(100))
+    bank_trx_no = Column(String(100))
+
+    paid_date = Column(DateTime)

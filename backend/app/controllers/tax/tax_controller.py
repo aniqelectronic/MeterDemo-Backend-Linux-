@@ -7,10 +7,14 @@ import qrcode
 from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.models.tax.tax_model import OwnerCreate, PropertyCreate, TaxCreate, TaxResponse
-from app.schema.tax.tax_schema import CukaiTaksiran, Owner, Property
 from app.controllers.tax.tax_receipt import generate_multi_tax_pdf
 from app.utils.blob_upload import upload_to_blob 
-
+from app.schema.tax.tax_schema import (
+    CukaiTaksiran,
+    Owner,
+    Property,
+    PaymentUpdatesCukaiTaksiranBentong
+)
 
 import html
 from datetime import datetime
@@ -106,7 +110,7 @@ def get_taxes_by_ic_with_property_type(ic: str, db: Session = Depends(get_db)):
     return result
 
 
-# --- Renew tax by extending due_date or creating new record ---
+# --- Renew tax by extending due_date or creating new record. THIS IS FOR TESTING DEMO ONLY ---
 @router.post("/renew/{bill_no}", response_model=TaxResponse)
 def renew_tax(bill_no: str, db: Session = Depends(get_db), extra_days: int = 180):
     tax = db.query(CukaiTaksiran).filter(CukaiTaksiran.bill_no == bill_no).first()
@@ -121,6 +125,7 @@ def renew_tax(bill_no: str, db: Session = Depends(get_db), extra_days: int = 180
     db.refresh(tax)
     return tax
 
+##This HTML BELOW IS FOR BENTONG TAX RECEIPT ONLY. NOT USED FOR OTHER TAX RECEIPTS. PLEASE IGNORE.CAN BE USED FOR DEMO OR FUTURE REFERENCE ONLY. NOT PRODUCTION READY.
 
 def generate_tax_receipt_bentong_html(
     paid_date: datetime,
@@ -380,6 +385,7 @@ def generate_tax_receipt_bentong_html(
 </html>
 """
 
+#This called function BELOW is for generating tax receipt in PDF and HTML for Bentong only.
 
 @router.post("/receipt/qr/bentong")
 def generate_bentong_tax_receipt(payload: dict):
@@ -458,6 +464,134 @@ def generate_bentong_tax_receipt(payload: dict):
     buf.seek(0)
 
     return StreamingResponse(buf, media_type="image/png")
+
+
+#The code is for receiving payment updates from Bentong tax system. 
+
+@router.post("/payment-updates-cukaitaksiran-bentong")
+def create_payment_updates_cukaitaksiran_bentong(
+    payload: dict,
+    db: Session = Depends(get_db)
+):
+    order_no = payload.get("order_no")
+    paid_date_raw = payload.get("paid_date")
+    payment_method = payload.get("payment_method")
+    bank_trx_no = payload.get("bank_trx_no")
+    tax_items = payload.get("tax_items", [])
+
+    if not order_no:
+        raise HTTPException(status_code=400, detail="Missing order_no")
+
+    if not paid_date_raw:
+        raise HTTPException(status_code=400, detail="Missing paid_date")
+
+    if not tax_items:
+        raise HTTPException(status_code=400, detail="No tax items provided")
+
+    try:
+        paid_date = datetime.fromisoformat(paid_date_raw)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid paid_date format")
+
+    created_updates = []
+
+    for index, item in enumerate(tax_items, start=1):
+        if not item.get("no_pendaftaran"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing no_pendaftaran at item {index}"
+            )
+
+        if not item.get("account_number"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing account_number at item {index}"
+            )
+
+        if not item.get("owner_name"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing owner_name at item {index}"
+            )
+
+        if not item.get("property_address"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing property_address at item {index}"
+            )
+
+        if item.get("amount") is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing amount at item {index}"
+            )
+
+        payment_update = PaymentUpdatesCukaiTaksiranBentong(
+            order_no=order_no,
+            no_pendaftaran=item.get("no_pendaftaran"),
+            account_number=item.get("account_number"),
+            owner_name=item.get("owner_name"),
+            property_address=item.get("property_address"),
+            amount=float(item.get("amount")),
+            payment_method=payment_method,
+            bank_trx_no=bank_trx_no,
+            paid_date=paid_date
+        )
+
+        db.add(payment_update)
+        created_updates.append(payment_update)
+
+    db.commit()
+
+    for payment_update in created_updates:
+        db.refresh(payment_update)
+
+    return {
+        "message": "Payment updates created successfully",
+        "total_records": len(created_updates),
+        "data": created_updates
+    }
+    
+#this code is for checking payment updates from Bentong tax system by no_pendaftaran or account_number. It will return the payment updates records if found.
+    
+@router.get("/payment-updates-cukaitaksiran-bentong/semakan")
+def semakan_payment_updates_cukaitaksiran_bentong(
+    no_pendaftaran: str = None,
+    account_number: str = None,
+    db: Session = Depends(get_db)
+):
+    if not no_pendaftaran and not account_number:
+        raise HTTPException(
+            status_code=400,
+            detail="Please provide no_pendaftaran or account_number"
+        )
+
+    query = db.query(PaymentUpdatesCukaiTaksiranBentong)
+
+    if account_number:
+        query = query.filter(
+            PaymentUpdatesCukaiTaksiranBentong.account_number == account_number
+        )
+
+    elif no_pendaftaran:
+        query = query.filter(
+            PaymentUpdatesCukaiTaksiranBentong.no_pendaftaran == no_pendaftaran
+        )
+
+    results = query.order_by(
+        PaymentUpdatesCukaiTaksiranBentong.paid_date.desc()
+    ).all()
+
+    if not results:
+        raise HTTPException(
+            status_code=404,
+            detail="No payment update found"
+        )
+
+    return results
+
+
+##CODE BELOW IS TESTING DEMO ONLY NOT USED IN PRODUCTION. PLEASE IGNORE.
 
 @router.post("/receipt/qr/multi")
 def generate_multi_tax_receipt(payload: dict, db: Session = Depends(get_db)):
