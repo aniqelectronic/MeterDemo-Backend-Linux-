@@ -1,12 +1,15 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.orm import Session
 from fastapi.responses import StreamingResponse
 from datetime import datetime
 from io import BytesIO
 import qrcode
 from app.utils.blob_upload import upload_to_blob 
+from app.schema.sewaan.sewaan_schema import PaymentUpdatesSewaanBentong
 
 # Import your sewaan receipt generator
 from app.controllers.sewaan.sewaan_receipt_bentong import generate_sewaan_receipt_bentong
+from backend.app.db.database import get_db
 
 
 router = APIRouter(prefix="/sewaan", tags=["Sewaan"])
@@ -294,3 +297,118 @@ def generate_bentong_sewaan_receipt(payload: dict):
     buf.seek(0)
 
     return StreamingResponse(buf, media_type="image/png")
+
+
+@router.post("/payment-updates-sewaan-bentong")
+def create_payment_updates_sewaan_bentong(
+    payload: dict,
+    db: Session = Depends(get_db)
+):
+    order_no = payload.get("order_no")
+    paid_date_raw = payload.get("paid_date")
+    payment_method = payload.get("payment_method")
+    bank_trx_no = payload.get("bank_trx_no")
+    sewaan_items = payload.get("sewaan_items", [])
+
+    if not order_no:
+        raise HTTPException(status_code=400, detail="Missing order_no")
+
+    if not paid_date_raw:
+        raise HTTPException(status_code=400, detail="Missing paid_date")
+
+    if not sewaan_items:
+        raise HTTPException(status_code=400, detail="No sewaan items provided")
+
+    try:
+        paid_date = datetime.fromisoformat(paid_date_raw)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid paid_date format")
+
+    created_updates = []
+
+    for index, item in enumerate(sewaan_items, start=1):
+        if not item.get("account_number"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing account_number at item {index}"
+            )
+
+        if not item.get("tenant_name"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing tenant_name at item {index}"
+            )
+
+        if not item.get("premise_address"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing premise_address at item {index}"
+            )
+
+        if item.get("amount") is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing amount at item {index}"
+            )
+
+        payment_update = PaymentUpdatesSewaanBentong(
+            order_no=order_no,
+            account_number=item.get("account_number"),
+            tenant_name=item.get("tenant_name"),
+            premise_address=item.get("premise_address"),
+            amount=float(item.get("amount")),
+            payment_method=payment_method,
+            bank_trx_no=bank_trx_no,
+            paid_date=paid_date
+        )
+
+        db.add(payment_update)
+        created_updates.append(payment_update)
+
+    db.commit()
+
+    for payment_update in created_updates:
+        db.refresh(payment_update)
+
+    return {
+        "message": "Sewaan payment updates created successfully",
+        "total_records": len(created_updates),
+        "data": created_updates
+    }
+    
+    
+@router.get("/payment-updates-sewaan-bentong/semakan")
+def semakan_payment_updates_sewaan_bentong(
+    account_number: str = None,
+    order_no: str = None,
+    db: Session = Depends(get_db)
+):
+    if not account_number and not order_no:
+        raise HTTPException(
+            status_code=400,
+            detail="Please provide account_number or order_no"
+        )
+
+    query = db.query(PaymentUpdatesSewaanBentong)
+
+    if order_no:
+        query = query.filter(
+            PaymentUpdatesSewaanBentong.order_no == order_no
+        )
+
+    elif account_number:
+        query = query.filter(
+            PaymentUpdatesSewaanBentong.account_number == account_number
+        )
+
+    results = query.order_by(
+        PaymentUpdatesSewaanBentong.paid_date.desc()
+    ).all()
+
+    if not results:
+        raise HTTPException(
+            status_code=404,
+            detail="No sewaan payment update found"
+        )
+
+    return results
