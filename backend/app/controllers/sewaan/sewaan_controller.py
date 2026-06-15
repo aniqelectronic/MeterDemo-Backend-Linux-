@@ -9,7 +9,7 @@ from app.schema.sewaan.sewaan_schema import PaymentUpdatesSewaanBentong
 
 # Import your sewaan receipt generator
 from app.controllers.sewaan.sewaan_receipt_bentong import generate_sewaan_receipt_bentong
-from backend.app.db.database import get_db
+from app.db.database import get_db
 
 
 router = APIRouter(prefix="/sewaan", tags=["Sewaan"])
