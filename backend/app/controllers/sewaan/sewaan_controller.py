@@ -353,6 +353,7 @@ def create_payment_updates_sewaan_bentong(
 
         payment_update = PaymentUpdatesSewaanBentong(
             order_no=order_no,
+            no_pendaftaran=item.get("no_pendaftaran"),
             account_number=item.get("account_number"),
             tenant_name=item.get("tenant_name"),
             premise_address=item.get("premise_address"),
@@ -379,14 +380,15 @@ def create_payment_updates_sewaan_bentong(
     
 @router.get("/payment-updates-sewaan-bentong/semakan")
 def semakan_payment_updates_sewaan_bentong(
+    no_pendaftaran: str = None,
     account_number: str = None,
     order_no: str = None,
     db: Session = Depends(get_db)
 ):
-    if not account_number and not order_no:
+    if not no_pendaftaran and not account_number and not order_no:
         raise HTTPException(
             status_code=400,
-            detail="Please provide account_number or order_no"
+            detail="Please provide no_pendaftaran, account_number or order_no"
         )
 
     query = db.query(PaymentUpdatesSewaanBentong)
@@ -399,6 +401,11 @@ def semakan_payment_updates_sewaan_bentong(
     elif account_number:
         query = query.filter(
             PaymentUpdatesSewaanBentong.account_number == account_number
+        )
+
+    elif no_pendaftaran:
+        query = query.filter(
+            PaymentUpdatesSewaanBentong.no_pendaftaran == no_pendaftaran
         )
 
     results = query.order_by(

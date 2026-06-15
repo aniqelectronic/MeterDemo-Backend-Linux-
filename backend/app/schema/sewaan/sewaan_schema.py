@@ -9,7 +9,8 @@ class PaymentUpdatesSewaanBentong(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     order_no = Column(String, index=True, nullable=False)
-
+    
+    no_pendaftaran = Column(String(100), index=True, nullable=True)
     account_number = Column(String, index=True, nullable=False)
     tenant_name = Column(String, nullable=False)
     premise_address = Column(String, nullable=False)
