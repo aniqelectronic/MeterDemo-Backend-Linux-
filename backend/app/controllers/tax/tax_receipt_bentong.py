@@ -15,7 +15,7 @@ BENTONG_LOGO = None
 BENTONG_LOGO_PATH = "app/resources/images/majlisbentong.png"
 
 COMPANY_LOGO = None
-COMPANY_LOGO_PATH = "app/resources/images/City_Car_Park_logo.png"
+COMPANY_LOGO_PATH = "app/resources/images/jip_logo.png"
 
 
 try:
@@ -143,7 +143,7 @@ def _draw_page_header(c, width, height, primary_blue, secondary_blue, light_blue
         _draw_image_keep_ratio(
             c,
             COMPANY_LOGO,
-            width - 160,
+            width - 120,
             height - 112,
             120,
             70,

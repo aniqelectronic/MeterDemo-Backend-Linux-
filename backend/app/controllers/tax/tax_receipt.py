@@ -8,7 +8,7 @@ from reportlab.platypus import Paragraph
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_LEFT
 
-LOGO_PATH = "app/resources/images/City_Car_Park_logo.png"
+LOGO_PATH = "app/resources/images/jip_logo.png"
 
 LOGO_RL = None
 if os.path.exists(LOGO_PATH):

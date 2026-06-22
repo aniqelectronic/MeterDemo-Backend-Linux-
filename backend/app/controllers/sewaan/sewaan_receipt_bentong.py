@@ -15,7 +15,7 @@ BENTONG_LOGO = None
 BENTONG_LOGO_PATH = "app/resources/images/majlisbentong.png"
 
 COMPANY_LOGO = None
-COMPANY_LOGO_PATH = "app/resources/images/City_Car_Park_logo.png"
+COMPANY_LOGO_PATH = "app/resources/images/jip_logo.png"
 
 
 try:
@@ -167,7 +167,7 @@ def _draw_footer(c, width, primary_blue, grey_text):
         _draw_image_keep_ratio(c, BENTONG_LOGO, 50, 25, 35, 35)
 
     if COMPANY_LOGO:
-        _draw_image_keep_ratio(c, COMPANY_LOGO, width - 100, 25, 55, 35)
+        _draw_image_keep_ratio(c, COMPANY_LOGO, width - 70, 25, 55, 35)
 
     c.setFillColor(primary_blue)
     c.setFont("Helvetica-Bold", 8)
