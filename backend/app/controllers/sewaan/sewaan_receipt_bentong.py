@@ -139,7 +139,7 @@ def _draw_page_header(c, width, height, primary_blue, secondary_blue, light_blue
         _draw_image_keep_ratio(c, BENTONG_LOGO, 35, height - 122, 85, 85)
 
     if COMPANY_LOGO:
-        _draw_image_keep_ratio(c, COMPANY_LOGO, width - 160, height - 112, 120, 70)
+        _draw_image_keep_ratio(c, COMPANY_LOGO, width - 120, height - 112, 120, 70)
 
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 16)
