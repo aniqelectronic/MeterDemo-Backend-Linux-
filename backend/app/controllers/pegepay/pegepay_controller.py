@@ -501,7 +501,7 @@ def iframe_wrapper(iframe_url: str):
 
             .iframe-container iframe {{
                 width: 1080px;
-                height: 1400px;
+                height: 1500px;
                 border: none;
 
                 /* adjust crop here */
