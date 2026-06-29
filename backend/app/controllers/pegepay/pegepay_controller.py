@@ -501,7 +501,7 @@ def iframe_wrapper(iframe_url: str):
 
             .iframe-container iframe {{
                 width: 1080px;
-                height: 1500px;
+                height: 1800px;
                 border: none;
 
                 /* adjust crop here */
@@ -527,7 +527,7 @@ def iframe_wrapper(iframe_url: str):
 
             .button-container {{
                 position: fixed;
-                bottom: 40px;
+                bottom: 100px;
                 left: 50%;
                 transform: translateX(-50%);
                 z-index: 999;
