@@ -478,113 +478,120 @@ def iframe_wrapper(iframe_url: str):
         <title>PegePay QR Payment</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-            <style>
-                html, body {{
-                    margin: 0;
-                    padding: 0;
-                    width: 100%;
-                    height: 100%;
-                    background: #ffffff;
-                    font-family: Arial, sans-serif;
-                    overflow: hidden;
-                }}
+        <style>
+            body {{
+                margin: 0;
+                background: #ffffff;
+                font-family: Arial, sans-serif;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }}
 
-                body {{
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                }}
+            .iframe-container {{
+                width: 100vw;
+                height: 58vh;
+                overflow: hidden;
+                display: flex;
+                justify-content: center;
+                align-items: flex-start;
+                background: white;
+            }}
 
-                .iframe-container {{
-                    width: 100vw;
-                    height: 62vh;
-                    overflow: hidden;
-                    display: flex;
-                    justify-content: center;
-                    align-items: flex-start;
-                    background: white;
-                }}
+            .iframe-container iframe {{
+                width: 1080px;
+                height: 1400px;
+                border: none;
 
-                .iframe-container iframe {{
-                    width: 1000px;
-                    height: 1300px;
-                    border: none;
+                /* adjust crop here */
+                transform: scale(2.0) translateX(-50%) translateY(-18%);
+                transform-origin: top left;
+            }}
 
-                    transform: scale(1.75) translateX(-42%) translateY(-15%);
-                    transform-origin: top left;
-                }}
+            .promo-container {{
+                position: fixed;
+                bottom: 140px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 998;
+                width: 80vw;
+                text-align: center;
+            }}
 
-                .promo-container {{
-                    position: fixed;
-                    bottom: 150px;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    z-index: 998;
-                    width: 92vw;
-                    text-align: center;
-                }}
+            .promo-container img {{
+                width: 100%;
+                max-width: 600px;
+                border-radius: 15px;
+            }}
 
-                .promo-container img {{
-                    width: 100%;
-                    max-width: 720px;
-                    border-radius: 15px;
-                }}
+            .button-container {{
+                position: fixed;
+                bottom: 40px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 999;
+            }}
 
-                .button-container {{
-                    position: fixed;
-                    bottom: 45px;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    z-index: 999;
-                }}
+            button {{
+                width: 300px;
+                height: 65px;
+                font-size: 22px;
+            }}
 
-                button {{
-                    width: 330px;
-                    height: 70px;
-                    font-size: 24px;
-                    font-weight: bold;
-                    color: white;
-                    background-color: red;
-                    border: none;
-                    border-radius: 10px;
-                    cursor: pointer;
-                }}
+            button:active {{
+                background-color: darkred;
+            }}
+            
+            .promo-container {{
+                position: fixed;
+                bottom: 180px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 998;
+            }}
 
-                button:active {{
-                    background-color: darkred;
-                }}
+            .promo-container img {{
+                width: 900px;
+                max-width: 95vw;
+                border-radius: 15px;
+            }}
 
-                .loader {{
-                    position: fixed;
-                    inset: 0;
-                    background: white;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    flex-direction: column;
-                    z-index: 99999;
-                }}
+            /* ================= LOADING OVERLAY ================= */
+            .loader {{
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: white;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                flex-direction: column;
+                z-index: 99999;
+            }}
 
-                .spinner {{
-                    width: 80px;
-                    height: 80px;
-                    border: 10px solid #eee;
-                    border-top: 10px solid #0359d2;
-                    border-radius: 50%;
-                    animation: spin 1s linear infinite;
-                }}
+            .spinner {{
+                width: 90px;
+                height: 90px;
+                border: 10px solid #eee;
+                border-top: 10px solid #0359d2;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+            }}
 
-                .loader-text {{
-                    margin-top: 20px;
-                    font-size: 24px;
-                    font-weight: bold;
-                    color: #0359d2;
-                }}
+            .loader-text {{
+                margin-top: 20px;
+                font-size: 28px;
+                font-weight: bold;
+                color: #0359d2;
+            }}
 
-                @keyframes spin {{
-                    100% {{ transform: rotate(360deg); }}
-                }}
-            </style>
+            @keyframes spin {{
+                100% {{ transform: rotate(360deg); }}
+            }}
+        </style>
     </head>
 
     <body>
