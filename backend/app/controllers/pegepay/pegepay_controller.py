@@ -606,11 +606,11 @@ def iframe_wrapper(iframe_url: str):
             <iframe id="qrFrame"></iframe>
         </div>
         
-        <!--
+        
         <div class="promo-container">
             <img src="/pegepay/qr-guide" alt="QR Guide">
         </div>
-        -->
+        
 
         <div class="button-container">
             <button onclick="cancelPayment()">Batal / Cancel</button>
