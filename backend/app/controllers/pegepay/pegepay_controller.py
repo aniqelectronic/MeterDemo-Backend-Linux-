@@ -552,8 +552,8 @@ def iframe_wrapper(iframe_url: str):
             }}
 
             .promo-container img {{
-                width: 900px;
-                max-width: 95vw;
+                width: 60%;
+                max-width: 550px;
                 border-radius: 15px;
             }}
 
