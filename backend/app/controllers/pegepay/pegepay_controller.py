@@ -527,7 +527,7 @@ def iframe_wrapper(iframe_url: str):
 
             .button-container {{
                 position: fixed;
-                bottom: 70px;
+                bottom: 50px;
                 left: 50%;
                 transform: translateX(-50%);
                 z-index: 999;
@@ -545,14 +545,14 @@ def iframe_wrapper(iframe_url: str):
             
             .promo-container {{
                 position: fixed;
-                bottom: 150px;
+                bottom: 120px;
                 left: 50%;
                 transform: translateX(-50%);
                 z-index: 998;
             }}
 
             .promo-container img {{
-                width: 80%;
+                width: 100%;
                 max-width: 550px;
                 border-radius: 15px;
             }}
