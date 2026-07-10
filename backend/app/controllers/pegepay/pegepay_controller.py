@@ -20,20 +20,47 @@ from app.utils.config import refresh_token
 from app.utils.sirim_time import sirim_now_naive
 
 
-router = APIRouter(prefix="/pegepay", tags=["Pegepay"])
+router = APIRouter(
+    prefix="/pegepay",
+    tags=["Pegepay"],
+)
+
 
 PEPAY_TOKEN_URL = "https://pegepay.com/api/get-access-token"
-PEPAY_ORDER_URL = "https://pegepay.com/api/npd-wa/order-create/custom-validity"
-PEPAY_STATUS_URL = "https://pegepay.com/api/pos/transaction-details"
+PEPAY_ORDER_URL = (
+    "https://pegepay.com/api/npd-wa/"
+    "order-create/custom-validity"
+)
+PEPAY_STATUS_URL = (
+    "https://pegepay.com/api/pos/"
+    "transaction-details"
+)
+
+
+# =========================================================
+# TERMINAL ID
+# =========================================================
 
 def clean_terminal_id(terminal_id: str) -> str:
     """
-    Clean terminal ID and keep maximum 4 characters.
+    Clean the terminal ID for use inside the PegePay order number.
 
-    Example:
-        TIP01 -> TIP0
+    The order-number terminal code is limited to four characters
+    so the complete order number remains below PegePay's
+    15-character limit.
+
+    Examples:
         KN08  -> KN08
+        kn08  -> KN08
+        KN 08 -> KN08
+        TIP01 -> TIP0
+
+    Important:
+        If the actual PegePay terminal ID contains more than four
+        characters, keep the actual terminal ID separately for the
+        PegePay API payload.
     """
+
     cleaned = re.sub(
         r"[^A-Za-z0-9]",
         "",
@@ -46,88 +73,270 @@ def clean_terminal_id(terminal_id: str) -> str:
     return cleaned[:4]
 
 
+def clean_actual_terminal_id(terminal_id: str) -> str:
+    """
+    Clean the complete terminal ID received from the frontend.
+
+    Unlike clean_terminal_id(), this function does not shorten
+    the terminal ID. It is used for the actual PegePay API request.
+    """
+
+    cleaned = re.sub(
+        r"[^A-Za-z0-9_-]",
+        "",
+        terminal_id.strip(),
+    ).upper()
+
+    if not cleaned:
+        raise HTTPException(
+            status_code=400,
+            detail="Terminal ID is required",
+        )
+
+    return cleaned
+
+
+# =========================================================
+# ORDER NUMBER GENERATOR
+# =========================================================
+
 def generate_pegepay_order_no(
     db: Session,
     terminal_id: str,
     current_time=None,
 ) -> str:
     """
-    Format:
+    Generate a PegePay order number.
 
     Format:
-
-    TTTTDDMMYYCCC
+        TTTTDDMMYYCCCC
 
     Example:
-    KN08100726001
+        KN081007260001
 
-    Terminal : KN08
-    Date     : 10/07/26
-    Count    : 001
+    Breakdown:
+        KN08   = terminal code
+        100726 = 10 July 2026
+        0001   = first order for that terminal on that day
+
+    Rules:
+        - Uses SIRIM time as the first priority.
+        - Counter is separate for each terminal.
+        - Counter resets automatically when the SIRIM date changes.
+        - Supports 0001 until 9999.
+        - Maximum generated length is 14 characters.
+        - PegePay maximum allowed length is 15 characters.
     """
 
+    # Use the supplied SIRIM time or retrieve it now.
     now = current_time or sirim_now_naive()
 
-    terminal = clean_terminal_id(terminal_id)
+    terminal_code = clean_terminal_id(terminal_id)
 
-    date_part = now.strftime("%m%y")
+    # DDMMYY based on SIRIM time.
+    date_part = now.strftime("%d%m%y")
 
-    prefix = f"{terminal}{date_part}"
+    # Example: KN08100726
+    prefix = f"{terminal_code}{date_part}"
 
-    monthly_count  = (
+    # Count only orders belonging to:
+    # 1. The same terminal code
+    # 2. The same SIRIM date
+    daily_count = (
         db.query(func.count(PegepayOrder.id))
         .filter(
-            PegepayOrder.terminal_id == terminal,
-            PegepayOrder.order_no.like(f"{prefix}%"),
+            PegepayOrder.order_no.like(
+                f"{prefix}%"
+            )
         )
         .scalar()
         or 0
     )
 
-    next_count = monthly_count  + 1
+    next_count = daily_count + 1
 
-    if next_count > 999:
+    if next_count > 9999:
         raise HTTPException(
             status_code=500,
-            detail=f"Daily order limit exceeded for terminal {terminal}",
+            detail=(
+                "Daily PegePay order limit exceeded "
+                f"for terminal {terminal_code}"
+            ),
         )
 
-    return f"{prefix}{next_count:03d}"
-    
+    order_no = f"{prefix}{next_count:04d}"
+
+    # PegePay only allows a maximum of 15 characters.
+    if len(order_no) > 15:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Generated PegePay order number is too long: "
+                f"{order_no}"
+            ),
+        )
+
+    return order_no
+
+
+def generate_retry_order_no(
+    db: Session,
+    terminal_id: str,
+    previous_order_no: str,
+    existing_order: PegepayOrder | None,
+) -> str:
+    """
+    Generate a different order number for a PegePay retry.
+
+    If an existing order is already stored in MySQL, the normal
+    database counter can generate the next number.
+
+    If the first generated order has not yet been stored, manually
+    increase the final four-digit counter to prevent retrying with
+    the same order number.
+    """
+
+    retry_sirim_time = sirim_now_naive()
+
+    if existing_order is not None:
+        return generate_pegepay_order_no(
+            db=db,
+            terminal_id=terminal_id,
+            current_time=retry_sirim_time,
+        )
+
+    # The first generated order was not saved in MySQL.
+    # Increase its final four digits manually.
+    if len(previous_order_no) < 4:
+        raise HTTPException(
+            status_code=500,
+            detail="Invalid previous PegePay order number",
+        )
+
+    try:
+        current_count = int(previous_order_no[-4:])
+    except ValueError as error:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Unable to read PegePay order counter from "
+                f"{previous_order_no}"
+            ),
+        ) from error
+
+    next_count = current_count + 1
+
+    if next_count > 9999:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Daily PegePay order limit exceeded "
+                f"for terminal {terminal_id}"
+            ),
+        )
+
+    order_prefix = previous_order_no[:-4]
+    retry_order_no = (
+        f"{order_prefix}{next_count:04d}"
+    )
+
+    if len(retry_order_no) > 15:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Generated retry order number is too long: "
+                f"{retry_order_no}"
+            ),
+        )
+
+    return retry_order_no
+
+
+# =========================================================
+# PEGE PAY TOKEN
+# =========================================================
+
 def get_pegepay_token(db: Session):
     """
-    Return a valid Pegepay token (shared via DB).
-    Auto-refreshes when expired.
+    Return a valid PegePay access token.
+
+    The token is shared through MySQL and refreshed automatically
+    when it has expired.
     """
+
     current_time_ms = int(time.time() * 1000)
 
-    token_entry = db.query(PegepayToken).order_by(PegepayToken.id.desc()).first()
+    token_entry = (
+        db.query(PegepayToken)
+        .order_by(PegepayToken.id.desc())
+        .first()
+    )
 
-    # ✅ Still valid
-    if token_entry and current_time_ms < token_entry.token_expired_at:
+    # Existing token is still valid.
+    if (
+        token_entry
+        and current_time_ms
+        < token_entry.token_expired_at
+    ):
         return token_entry.access_token
 
-    # 🔄 Refresh from Pegepay
-    headers = {"Content-Type": "application/json"}
-    payload = {"refresh_token": refresh_token}
+    headers = {
+        "Content-Type": "application/json",
+    }
 
-    response = requests.post(PEPAY_TOKEN_URL, json=payload, headers=headers)
+    payload = {
+        "refresh_token": refresh_token,
+    }
+
+    try:
+        response = requests.post(
+            PEPAY_TOKEN_URL,
+            json=payload,
+            headers=headers,
+            timeout=20,
+        )
+    except requests.RequestException as error:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Unable to connect to PegePay token service: "
+                f"{error}"
+            ),
+        ) from error
+
     if response.status_code != 200:
-        raise HTTPException(status_code=response.status_code, detail=response.text)
+        raise HTTPException(
+            status_code=response.status_code,
+            detail=response.text,
+        )
 
     data = response.json()
+
     access_token = data.get("access_token")
-    token_expired_at = data.get("token_expired_at", 0)
+    token_expired_at = data.get(
+        "token_expired_at",
+        0,
+    )
 
     if not access_token:
-        raise HTTPException(status_code=500, detail="Access token not found in Pegepay response")
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Access token was not found in "
+                "the PegePay response"
+            ),
+        )
 
-    # ✅ Save to DB (replace existing)
     if token_entry:
         token_entry.access_token = access_token
-        token_entry.token_expired_at = token_expired_at
+        token_entry.token_expired_at = (
+            token_expired_at
+        )
     else:
-        token_entry = PegepayToken(access_token=access_token, token_expired_at=token_expired_at)
+        token_entry = PegepayToken(
+            access_token=access_token,
+            token_expired_at=token_expired_at,
+        )
         db.add(token_entry)
 
     db.commit()
@@ -136,133 +345,78 @@ def get_pegepay_token(db: Session):
     return access_token
 
 
+# =========================================================
+# QR GUIDE IMAGE
+# =========================================================
+
 @router.get("/qr-guide")
 def qr_guide():
     return FileResponse(
         "app/resources/images/qr_guide2.png",
-        media_type="image/png"
+        media_type="image/png",
     )
 
 
-# # ---------------------- Create Order ----------------------
-# @router.post("/create-order")
-# def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
-#     # ✅ Step 1: Use terminal_id as the code
-#     terminal_code = body.terminal_id.strip()  # e.g. "KN08"
-#     terminal_prefix = f"TXN-{terminal_code}-"
-
-#     # ✅ Step 2: Check for unprocessed order for this specific terminal_id
-#     existing_order = (
-#         db.query(PegepayOrder)
-#         .filter(PegepayOrder.terminal_id == terminal_code)
-#         .filter(PegepayOrder.order_status == "unprocessed")
-#         .order_by(PegepayOrder.id.desc())
-#         .first()
-#     )
-
-#     if existing_order:
-#         order_no = existing_order.order_no
-#         print(f"Reusing unprocessed order: {order_no} for terminal {terminal_code}")
-#     else:
-#         # ✅ Step 3: Find last order for this terminal_id
-#         last_order = (
-#             db.query(PegepayOrder)
-#             .filter(PegepayOrder.terminal_id == terminal_code)
-#             .filter(PegepayOrder.order_no.like(f"{terminal_prefix}%"))
-#             .order_by(PegepayOrder.id.desc())
-#             .first()
-#         )
-
-#         if last_order and last_order.order_no.startswith(terminal_prefix):
-#             try:
-#                 last_number = int(last_order.order_no.split("-")[-1])
-#             except ValueError:
-#                 last_number = 0
-#         else:
-#             last_number = 0
-
-#         next_number = last_number + 1
-
-#         # ✅ Keep within PegePay 15-character limit
-#         max_length = 15 - len(terminal_prefix)
-#         order_no = f"{terminal_prefix}{str(next_number).zfill(max_length)}"[:15]
-
-#         print(f"Creating new order: {order_no} for terminal {terminal_code}")
-
-#     # ✅ Step 4: Prepare PegePay payload
-#     payload = {
-#         "order_output": "online",
-#         "image_file_format": "png",
-#         "order_no": order_no,
-#         "override_existing_unprocessed_order_no": "yes",
-#         "order_amount": str(body.order_amount),
-#         "qr_validity": str(body.qr_validity),
-#         "store_id": body.store_id,
-#         "terminal_id": terminal_code,  # use the same for API call
-#         "shift_id": body.shift_id
-#     }
-
-#     # ✅ Step 5: Get valid PegePay token
-#     access_token = get_pegepay_token(db)
-#     headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
-
-#     response = requests.post(PEPAY_ORDER_URL, json=payload, headers=headers)
-#     if response.status_code != 200:
-#         raise HTTPException(status_code=response.status_code, detail=response.text)
-
-#     res_data = response.json()
-#     iframe_url = res_data.get("content", {}).get("iframe_url")
-#     if not iframe_url:
-#         raise HTTPException(status_code=500, detail="iframe_url not found in Pegepay response")
-
-#     # ✅ Step 6: Save or update DB
-#     if existing_order:
-#         existing_order.order_amount = body.order_amount
-#         existing_order.order_status = "unprocessed"
-#         existing_order.store_id = body.store_id
-#         db.commit()
-#         db.refresh(existing_order)
-#     else:
-#         new_order = PegepayOrder(
-#             order_no=order_no,
-#             order_amount=body.order_amount,
-#             order_status="unprocessed",
-#             store_id=body.store_id,
-#             terminal_id=terminal_code
-#         )
-#         db.add(new_order)
-#         db.commit()
-#         db.refresh(new_order)
-
-#     return {"iframe_url": iframe_url, "order_no": order_no}
-
+# =========================================================
+# CREATE PEGE PAY ORDER
+# =========================================================
 
 @router.post("/create-order")
 def create_order(
     body: OrderCreateRequest,
     db: Session = Depends(get_db),
 ):
-    # Use a consistent cleaned terminal ID.
-    terminal_code = clean_terminal_id(body.terminal_id)
+    """
+    Create or reuse a PegePay QR payment order.
 
-    # Take the current SIRIM time once for this request.
-    current_sirim_time = sirim_now_naive()
-    month_part = current_sirim_time.strftime("%m%y")
+    Order-number format:
+        TTTTDDMMYYCCCC
 
-    # Only reuse an unprocessed order belonging to:
-    # 1. The same terminal
-    # 2. The current SIRIM date
-    current_month_prefix = (
-        f"TXN-{terminal_code}-{month_part}"
+    Example:
+        KN081007260001
+
+    The order number:
+        - Uses SIRIM time
+        - Resets the sequence each new day
+        - Has a separate sequence for each terminal
+        - Supports up to 9,999 orders per terminal per day
+    """
+
+    # Complete terminal ID for PegePay API.
+    actual_terminal_id = clean_actual_terminal_id(
+        body.terminal_id
     )
 
+    # Four-character terminal code for order number.
+    terminal_code = clean_terminal_id(
+        actual_terminal_id
+    )
+
+    # Use SIRIM time once for this request.
+    current_sirim_time = sirim_now_naive()
+
+    # DDMMYY from SIRIM time.
+    date_part = current_sirim_time.strftime(
+        "%d%m%y"
+    )
+
+    # Example: KN08100726
+    current_day_prefix = (
+        f"{terminal_code}{date_part}"
+    )
+
+    # Reuse only an unprocessed order from:
+    # 1. The same actual terminal
+    # 2. The same SIRIM date
     existing_order = (
         db.query(PegepayOrder)
         .filter(
-            PegepayOrder.terminal_id == terminal_code,
-            PegepayOrder.order_status == "unprocessed",
+            PegepayOrder.terminal_id
+            == actual_terminal_id,
+            PegepayOrder.order_status
+            == "unprocessed",
             PegepayOrder.order_no.like(
-                f"{current_month_prefix}%"
+                f"{current_day_prefix}%"
             ),
         )
         .order_by(PegepayOrder.id.desc())
@@ -273,8 +427,9 @@ def create_order(
         order_no = existing_order.order_no
 
         print(
-            f"Reusing today's unprocessed order: "
-            f"{order_no} for terminal {terminal_code}"
+            "[PegePay] Reusing today's unprocessed "
+            f"order {order_no} for terminal "
+            f"{actual_terminal_id}"
         )
     else:
         order_no = generate_pegepay_order_no(
@@ -284,8 +439,9 @@ def create_order(
         )
 
         print(
-            f"Creating new PegePay order: "
-            f"{order_no} for terminal {terminal_code}"
+            "[PegePay] Creating new order "
+            f"{order_no} for terminal "
+            f"{actual_terminal_id}"
         )
 
     payload = {
@@ -296,29 +452,40 @@ def create_order(
         "order_amount": str(body.order_amount),
         "qr_validity": str(body.qr_validity),
         "store_id": body.store_id,
-        "terminal_id": terminal_code,
+        "terminal_id": actual_terminal_id,
         "shift_id": body.shift_id,
     }
 
     access_token = get_pegepay_token(db)
 
     headers = {
-        "Authorization": f"Bearer {access_token}",
+        "Authorization": (
+            f"Bearer {access_token}"
+        ),
         "Content-Type": "application/json",
     }
 
-    # First PegePay request
-    response = requests.post(
-        PEPAY_ORDER_URL,
-        json=payload,
-        headers=headers,
-    )
+    # First PegePay request.
+    try:
+        response = requests.post(
+            PEPAY_ORDER_URL,
+            json=payload,
+            headers=headers,
+            timeout=30,
+        )
+    except requests.RequestException as error:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Unable to connect to PegePay "
+                f"order service: {error}"
+            ),
+        ) from error
 
-    # If PegePay rejects the reused order, mark it successful
-    # and retry using a newly generated order number.
+    # PegePay rejected the first order.
     if response.status_code != 200:
         print(
-            "PegePay rejected the order. "
+            "[PegePay] First order was rejected. "
             "Generating a new SIRIM-based order number."
         )
 
@@ -327,31 +494,40 @@ def create_order(
             db.commit()
 
             print(
-                f"Marked previous order "
+                "[PegePay] Marked previous order "
                 f"{existing_order.order_no} as successful."
             )
 
-        # Generate another number using the current SIRIM time.
-        retry_sirim_time = sirim_now_naive()
-
-        new_order_no = generate_pegepay_order_no(
+        # Generate a different retry order number.
+        new_order_no = generate_retry_order_no(
             db=db,
             terminal_id=terminal_code,
-            current_time=retry_sirim_time,
+            previous_order_no=order_no,
+            existing_order=existing_order,
         )
 
         print(
-            f"Retrying with new PegePay order number: "
-            f"{new_order_no}"
+            "[PegePay] Retrying with new order "
+            f"number {new_order_no}"
         )
 
         payload["order_no"] = new_order_no
 
-        retry_response = requests.post(
-            PEPAY_ORDER_URL,
-            json=payload,
-            headers=headers,
-        )
+        try:
+            retry_response = requests.post(
+                PEPAY_ORDER_URL,
+                json=payload,
+                headers=headers,
+                timeout=30,
+            )
+        except requests.RequestException as error:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Unable to connect to PegePay "
+                    f"during retry: {error}"
+                ),
+            ) from error
 
         if retry_response.status_code != 200:
             raise HTTPException(
@@ -374,7 +550,7 @@ def create_order(
             order_amount=body.order_amount,
             order_status="unprocessed",
             store_id=body.store_id,
-            terminal_id=terminal_code,
+            terminal_id=actual_terminal_id,
         )
 
         db.add(new_order)
@@ -391,9 +567,16 @@ def create_order(
         )
 
         if existing_order:
-            existing_order.order_amount = body.order_amount
+            existing_order.order_amount = (
+                body.order_amount
+            )
             existing_order.store_id = body.store_id
-            existing_order.terminal_id = terminal_code
+            existing_order.terminal_id = (
+                actual_terminal_id
+            )
+            existing_order.order_status = (
+                "unprocessed"
+            )
 
             db.commit()
             db.refresh(existing_order)
@@ -404,7 +587,7 @@ def create_order(
                 order_amount=body.order_amount,
                 order_status="unprocessed",
                 store_id=body.store_id,
-                terminal_id=terminal_code,
+                terminal_id=actual_terminal_id,
             )
 
             db.add(new_order)
@@ -414,7 +597,10 @@ def create_order(
     if not iframe_url:
         raise HTTPException(
             status_code=500,
-            detail="iframe_url missing from PegePay response",
+            detail=(
+                "iframe_url is missing from "
+                "the PegePay response"
+            ),
         )
 
     return {
@@ -423,173 +609,155 @@ def create_order(
     }
 
 
+# =========================================================
+# CHECK PAYMENT STATUS
+# =========================================================
 
-
-
-
-
-# ---------------------- Check Status ----------------------
 @router.post("/check-status")
-def check_order_status(body: OrderStatusRequest, db: Session = Depends(get_db)):
-    access_token = get_pegepay_token(db)
-    headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
-    payload = {"order_no": body.order_no}
+def check_order_status(
+    body: OrderStatusRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Check the latest payment status from PegePay.
 
-    response = requests.post(PEPAY_STATUS_URL, json=payload, headers=headers)
+    The local database is updated only when PegePay reports
+    that the payment was successful.
+    """
+
+    access_token = get_pegepay_token(db)
+
+    headers = {
+        "Authorization": (
+            f"Bearer {access_token}"
+        ),
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "order_no": body.order_no,
+    }
+
+    try:
+        response = requests.post(
+            PEPAY_STATUS_URL,
+            json=payload,
+            headers=headers,
+            timeout=30,
+        )
+    except requests.RequestException as error:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Unable to connect to PegePay "
+                f"status service: {error}"
+            ),
+        ) from error
+
     if response.status_code != 200:
-        raise HTTPException(status_code=response.status_code, detail=response.text)
+        raise HTTPException(
+            status_code=response.status_code,
+            detail=response.text,
+        )
 
     data = response.json()
-    if data.get("status") != "success" or "content" not in data:
-        raise HTTPException(status_code=500, detail="Invalid Pegepay response")
+
+    if (
+        data.get("status") != "success"
+        or "content" not in data
+    ):
+        raise HTTPException(
+            status_code=500,
+            detail="Invalid PegePay status response",
+        )
 
     content = data["content"]
     order_status = content.get("order_status")
 
-    # 🟡 If not successful, return directly — no DB update needed
     if order_status != "successful":
         return {
             "order_no": content.get("order_no"),
             "order_status": order_status,
-            "message": f"Payment not successful yet (current status: {order_status})"
+            "message": (
+                "Payment is not successful yet "
+                f"(current status: {order_status})"
+            ),
         }
 
-    # ✅ Only update DB when payment is successful
-    db.query(PegepayOrder).filter_by(order_no=body.order_no).update({
-        PegepayOrder.order_status: order_status,
-        PegepayOrder.order_amount: content.get("order_amount"),
-        PegepayOrder.store_id: content.get("store_id"),
-        PegepayOrder.terminal_id: content.get("terminal_id"),
-    })
+    db.query(PegepayOrder).filter_by(
+        order_no=body.order_no
+    ).update(
+        {
+            PegepayOrder.order_status:
+                order_status,
+            PegepayOrder.order_amount:
+                content.get("order_amount"),
+            PegepayOrder.store_id:
+                content.get("store_id"),
+            PegepayOrder.terminal_id:
+                content.get("terminal_id"),
+        }
+    )
+
     db.commit()
 
     return {
         "order_no": content.get("order_no"),
         "order_status": order_status,
-        "bank_trx_no": content.get("bank_trx_no")
+        "bank_trx_no": content.get(
+            "bank_trx_no"
+        ),
     }
 
-# ---------------------- Get All Orders ----------------------
+
+# =========================================================
+# GET ALL ORDERS
+# =========================================================
+
 @router.get("/get-all-orders")
-def get_all_orders(db: Session = Depends(get_db)):
-    orders = db.query(PegepayOrder).all()
+def get_all_orders(
+    db: Session = Depends(get_db),
+):
+    orders = (
+        db.query(PegepayOrder)
+        .order_by(PegepayOrder.id.desc())
+        .all()
+    )
+
     return [
         {
-            "id": o.id,
-            "order_no": o.order_no,
-            "order_amount": o.order_amount,
-            "order_status": o.order_status,
-            "store_id": o.store_id,
-            "terminal_id": o.terminal_id
+            "id": order.id,
+            "order_no": order.order_no,
+            "order_amount": order.order_amount,
+            "order_status": order.order_status,
+            "store_id": order.store_id,
+            "terminal_id": order.terminal_id,
         }
-        for o in orders
+        for order in orders
     ]
-    
-
-# @router.get("/iframe-wrapper", response_class=HTMLResponse)
-# def iframe_wrapper(iframe_url: str):
-#     html_content = f"""
-#     <!DOCTYPE html>
-#     <html lang="en">
-#     <head>
-#         <meta charset="UTF-8">
-#         <title>PegePay QR Payment</title>
-#         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-#         <style>
-#             body {{
-#                 margin: 0;
-#                 background: #ffffff;
-#                 font-family: Arial, sans-serif;
-#                 overflow: hidden; /* 🚫 no scrolling */
-#                 display: flex;
-#                 flex-direction: column;
-#                 align-items: center;
-#             }}
-
-#             .iframe-container {{
-#                 width: 100vw;
-#                 height: 65vh;
-#                 overflow: hidden;
-#                 display: flex;
-#                 justify-content: center;
-#                 align-items: flex-start;
-#                 background: white;
-#             }}
-
-#             .iframe-container iframe {{
-#              width: 1080px;   /* keep original width */
-#              height: 1400px;  /* keep original height */
-#              border: none;
-         
-#              transform: scale(2.5) translateX(-55%) translateY(-20%);
-#              transform-origin: top left;
-
-#             }}
-
-#             .button-container {{
-#              position: fixed;
-#              bottom: 300px;
-#              left: 50%;
-#              transform: translateX(-50%);
-#              z-index: 999;
-#             }}
-
-#             button {{
-#                 width: 400px;
-#                 height: 80px;
-#                 font-size: 28px;
-#                 font-weight: bold;
-#                 color: white;
-#                 background-color: red;
-#                 border: none;
-#                 border-radius: 10px;
-#                 cursor: pointer;
-#             }}
-
-#             button:active {{
-#                 background-color: darkred;
-#             }}
-#         </style>
-#     </head>
-
-#     <body>
-
-#         <div class="iframe-container">
-#             <iframe src="{iframe_url}" allowfullscreen></iframe>
-#         </div>
-
-#         <div class="button-container">
-#             <button onclick="cancelPayment()">Batal / Cancel</button>
-#         </div>
-
-#         <script>
-#     function cancelPayment() {{
-#         // ❌ window.close() won't work
-#         if (window.flutter_inappwebview) {{
-#             // for webview_flutter, optional
-#         }}
-#         // Send message to Flutter via custom URL scheme
-#         window.location.href = "app://cancelPayment";
-#     }}
-#         </script>
-
-#     </body>
-#     </html>
-#     """
-#     return HTMLResponse(content=html_content)
 
 
-@router.get("/iframe-wrapper", response_class=HTMLResponse)
+# =========================================================
+# IFRAME WRAPPER
+# =========================================================
+
+@router.get(
+    "/iframe-wrapper",
+    response_class=HTMLResponse,
+)
 def iframe_wrapper(iframe_url: str):
-
     html_content = f"""
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
+
         <title>PegePay QR Payment</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+        >
 
         <style>
             body {{
@@ -617,14 +785,17 @@ def iframe_wrapper(iframe_url: str):
                 height: 1700px;
                 border: none;
 
-                /* adjust crop here */
-                transform: scale(2.0) translateX(-50%) translateY(-18%);
+                transform:
+                    scale(2.0)
+                    translateX(-50%)
+                    translateY(-18%);
+
                 transform-origin: top left;
             }}
 
             .promo-container {{
                 position: fixed;
-                bottom: 140px;
+                bottom: 120px;
                 left: 50%;
                 transform: translateX(-50%);
                 z-index: 998;
@@ -634,7 +805,7 @@ def iframe_wrapper(iframe_url: str):
 
             .promo-container img {{
                 width: 100%;
-                max-width: 600px;
+                max-width: 550px;
                 border-radius: 15px;
             }}
 
@@ -655,22 +826,7 @@ def iframe_wrapper(iframe_url: str):
             button:active {{
                 background-color: darkred;
             }}
-            
-            .promo-container {{
-                position: fixed;
-                bottom: 120px;
-                left: 50%;
-                transform: translateX(-50%);
-                z-index: 998;
-            }}
 
-            .promo-container img {{
-                width: 100%;
-                max-width: 550px;
-                border-radius: 15px;
-            }}
-
-            /* ================= LOADING OVERLAY ================= */
             .loader {{
                 position: fixed;
                 top: 0;
@@ -688,7 +844,7 @@ def iframe_wrapper(iframe_url: str):
             .spinner {{
                 width: 90px;
                 height: 90px;
-                border: 10px solid #eee;
+                border: 10px solid #eeeeee;
                 border-top: 10px solid #0359d2;
                 border-radius: 50%;
                 animation: spin 1s linear infinite;
@@ -702,59 +858,71 @@ def iframe_wrapper(iframe_url: str):
             }}
 
             @keyframes spin {{
-                100% {{ transform: rotate(360deg); }}
+                100% {{
+                    transform: rotate(360deg);
+                }}
             }}
         </style>
     </head>
 
     <body>
-
-        <!-- 🔥 LOADING SCREEN (ADDED) -->
-        <div class="loader" id="loader">
+        <div
+            class="loader"
+            id="loader"
+        >
             <div class="spinner"></div>
-            <div class="loader-text">Loading QR Payment...</div>
+
+            <div class="loader-text">
+                Loading QR Payment...
+            </div>
         </div>
 
         <div class="iframe-container">
             <iframe id="qrFrame"></iframe>
         </div>
-        
-        
+
         <div class="promo-container">
-            <img src="/pegepay/qr-guide" alt="QR Guide">
+            <img
+                src="/pegepay/qr-guide"
+                alt="QR Guide"
+            >
         </div>
-        
 
         <div class="button-container">
-            <button onclick="cancelPayment()">Batal / Cancel</button>
+            <button onclick="cancelPayment()">
+                Batal / Cancel
+            </button>
         </div>
 
         <script>
             const iframeUrl = "{iframe_url}";
-            const iframe = document.getElementById("qrFrame");
-            const loader = document.getElementById("loader");
+            const iframe =
+                document.getElementById("qrFrame");
+            const loader =
+                document.getElementById("loader");
 
-            // start loading iframe
             iframe.src = iframeUrl;
 
-            // hide loader when loaded
             iframe.onload = () => {{
                 loader.style.display = "none";
             }};
 
-            // fallback if slow network
             setTimeout(() => {{
-                document.querySelector(".loader-text").innerText =
+                document.querySelector(
+                    ".loader-text"
+                ).innerText =
                     "Still loading QR... please wait";
             }}, 3000);
 
             function cancelPayment() {{
-                window.location.href = "app://cancelPayment";
+                window.location.href =
+                    "app://cancelPayment";
             }}
         </script>
-
     </body>
     </html>
     """
 
-    return HTMLResponse(content=html_content)
+    return HTMLResponse(
+        content=html_content
+    )
