@@ -45,20 +45,16 @@ def clean_terminal_id(terminal_id: str) -> str:
     """
     Clean the terminal ID for use inside the PegePay order number.
 
-    The order-number terminal code is limited to four characters
-    so the complete order number remains below PegePay's
-    15-character limit.
+    The terminal ID is kept exactly as received (after removing
+    invalid characters).
 
     Examples:
-        KN08  -> KN08
-        kn08  -> KN08
-        KN 08 -> KN08
-        TIP01 -> TIP0
+        KN08   -> KN08
+        TEST01 -> TEST01
+        BENT01 -> BENT01
 
-    Important:
-        If the actual PegePay terminal ID contains more than four
-        characters, keep the actual terminal ID separately for the
-        PegePay API payload.
+    Maximum supported terminal ID length is 6 characters because
+    the PegePay order number cannot exceed 15 characters.
     """
 
     cleaned = re.sub(
@@ -70,7 +66,7 @@ def clean_terminal_id(terminal_id: str) -> str:
     if not cleaned:
         cleaned = "UNKN"
 
-    return cleaned[:4]
+    return cleaned
 
 
 def clean_actual_terminal_id(terminal_id: str) -> str:
@@ -80,7 +76,6 @@ def clean_actual_terminal_id(terminal_id: str) -> str:
     Unlike clean_terminal_id(), this function does not shorten
     the terminal ID. It is used for the actual PegePay API request.
     """
-
     cleaned = re.sub(
         r"[^A-Za-z0-9_-]",
         "",
@@ -91,6 +86,12 @@ def clean_actual_terminal_id(terminal_id: str) -> str:
         raise HTTPException(
             status_code=400,
             detail="Terminal ID is required",
+        )
+
+    if len(cleaned) > 6:
+        raise HTTPException(
+            status_code=400,
+            detail="Terminal ID must not exceed 6 characters.",
         )
 
     return cleaned
