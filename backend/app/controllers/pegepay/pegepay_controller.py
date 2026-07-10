@@ -206,7 +206,7 @@ def generate_retry_order_no(
         )
 
     # The first generated order was not saved in MySQL.
-    # Increase its final four digits manually.
+    # Increase its final three  digits manually.
     if len(previous_order_no) < 3:
         raise HTTPException(
             status_code=500,
@@ -370,7 +370,7 @@ def create_order(
     Create or reuse a PegePay QR payment order.
 
     Order-number format:
-        TTTTDDMMYYCCCC
+        TTTTDDMMYYCCC
 
     Example:
         KN08100726001
