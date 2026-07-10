@@ -28,20 +28,22 @@ PEPAY_STATUS_URL = "https://pegepay.com/api/pos/transaction-details"
 
 def clean_terminal_id(terminal_id: str) -> str:
     """
-    Clean terminal ID before using it in the PegePay order number.
+    Clean terminal ID and keep maximum 4 characters.
 
-    Examples:
-        "TIP 01" -> "TIP01"
-        "tip-01" -> "TIP-01"
-        "TIP_01" -> "TIP_01"
+    Example:
+        TIP01 -> TIP0
+        KN08  -> KN08
     """
-    cleaned_terminal = re.sub(
-        r"[^A-Za-z0-9_-]",
+    cleaned = re.sub(
+        r"[^A-Za-z0-9]",
         "",
         terminal_id.strip(),
     ).upper()
 
-    return cleaned_terminal or "UNKNOWN"
+    if not cleaned:
+        cleaned = "UNKN"
+
+    return cleaned[:4]
 
 
 def generate_pegepay_order_no(
@@ -50,54 +52,47 @@ def generate_pegepay_order_no(
     current_time=None,
 ) -> str:
     """
-    Generate PegePay order number using:
+    Format:
 
-    TXN-TERMINALID-YYYYMMDDHHMMSS-COUNT
+    Format:
 
-    Daily count is separate for each terminal and resets to 01
-    on every new SIRIM date.
+    TTTTDDMMYYCCC
 
-    Examples:
-        TXN-TIP01-20260710104530-01
-        TXN-TIP01-20260710104720-02
-        TXN-TIP02-20260710104800-01
+    Example:
+    KN08100726001
+
+    Terminal : KN08
+    Date     : 10/07/26
+    Count    : 001
     """
 
-    # SIRIM time is the first priority.
     now = current_time or sirim_now_naive()
 
-    terminal_code = clean_terminal_id(terminal_id)
-    date_part = now.strftime("%Y%m%d")
-    date_time_part = now.strftime("%Y%m%d%H%M%S")
+    terminal = clean_terminal_id(terminal_id)
 
-    # Matches this terminal and this SIRIM date only.
-    daily_prefix = f"TXN-{terminal_code}-{date_part}"
+    date_part = now.strftime("%m%y")
 
-    terminal_daily_count = (
+    prefix = f"{terminal}{date_part}"
+
+    monthly_count  = (
         db.query(func.count(PegepayOrder.id))
         .filter(
-            PegepayOrder.terminal_id == terminal_code,
-            PegepayOrder.order_no.like(f"{daily_prefix}%"),
+            PegepayOrder.terminal_id == terminal,
+            PegepayOrder.order_no.like(f"{prefix}%"),
         )
         .scalar()
         or 0
     )
 
-    next_number = terminal_daily_count + 1
+    next_count = monthly_count  + 1
 
-    # Minimum two digits:
-    # 1    -> 01
-    # 9    -> 09
-    # 10   -> 10
-    # 100  -> 100
-    # 1000 -> 1000
-    count_part = f"{next_number:02d}"
+    if next_count > 999:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Daily order limit exceeded for terminal {terminal}",
+        )
 
-    return (
-        f"TXN-{terminal_code}-"
-        f"{date_time_part}-"
-        f"{count_part}"
-    )
+    return f"{prefix}{next_count:03d}"
     
 def get_pegepay_token(db: Session):
     """
@@ -252,13 +247,13 @@ def create_order(
 
     # Take the current SIRIM time once for this request.
     current_sirim_time = sirim_now_naive()
-    today_part = current_sirim_time.strftime("%Y%m%d")
+    month_part = current_sirim_time.strftime("%m%y")
 
     # Only reuse an unprocessed order belonging to:
     # 1. The same terminal
     # 2. The current SIRIM date
-    current_day_prefix = (
-        f"TXN-{terminal_code}-{today_part}"
+    current_month_prefix = (
+        f"TXN-{terminal_code}-{month_part}"
     )
 
     existing_order = (
@@ -267,7 +262,7 @@ def create_order(
             PegepayOrder.terminal_id == terminal_code,
             PegepayOrder.order_status == "unprocessed",
             PegepayOrder.order_no.like(
-                f"{current_day_prefix}%"
+                f"{current_month_prefix}%"
             ),
         )
         .order_by(PegepayOrder.id.desc())
