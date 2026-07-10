@@ -1,11 +1,23 @@
+import re
+import requests
+import time
+
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import HTMLResponse, FileResponse
-import requests, time
+from sqlalchemy import func
 from sqlalchemy.orm import Session
-from app.models.pegepay.pegepay_model import OrderCreateRequest, OrderStatusRequest
+
+from app.models.pegepay.pegepay_model import (
+    OrderCreateRequest,
+    OrderStatusRequest,
+)
 from app.db.database import get_db
-from app.schema.pegepay.pegepay_schema import PegepayOrder, PegepayToken
+from app.schema.pegepay.pegepay_schema import (
+    PegepayOrder,
+    PegepayToken,
+)
 from app.utils.config import refresh_token
+from app.utils.sirim_time import sirim_now_naive
 
 
 router = APIRouter(prefix="/pegepay", tags=["Pegepay"])
@@ -14,7 +26,79 @@ PEPAY_TOKEN_URL = "https://pegepay.com/api/get-access-token"
 PEPAY_ORDER_URL = "https://pegepay.com/api/npd-wa/order-create/custom-validity"
 PEPAY_STATUS_URL = "https://pegepay.com/api/pos/transaction-details"
 
+def clean_terminal_id(terminal_id: str) -> str:
+    """
+    Clean terminal ID before using it in the PegePay order number.
 
+    Examples:
+        "TIP 01" -> "TIP01"
+        "tip-01" -> "TIP-01"
+        "TIP_01" -> "TIP_01"
+    """
+    cleaned_terminal = re.sub(
+        r"[^A-Za-z0-9_-]",
+        "",
+        terminal_id.strip(),
+    ).upper()
+
+    return cleaned_terminal or "UNKNOWN"
+
+
+def generate_pegepay_order_no(
+    db: Session,
+    terminal_id: str,
+    current_time=None,
+) -> str:
+    """
+    Generate PegePay order number using:
+
+    TXN-TERMINALID-YYYYMMDDHHMMSS-COUNT
+
+    Daily count is separate for each terminal and resets to 01
+    on every new SIRIM date.
+
+    Examples:
+        TXN-TIP01-20260710104530-01
+        TXN-TIP01-20260710104720-02
+        TXN-TIP02-20260710104800-01
+    """
+
+    # SIRIM time is the first priority.
+    now = current_time or sirim_now_naive()
+
+    terminal_code = clean_terminal_id(terminal_id)
+    date_part = now.strftime("%Y%m%d")
+    date_time_part = now.strftime("%Y%m%d%H%M%S")
+
+    # Matches this terminal and this SIRIM date only.
+    daily_prefix = f"TXN-{terminal_code}-{date_part}"
+
+    terminal_daily_count = (
+        db.query(func.count(PegepayOrder.id))
+        .filter(
+            PegepayOrder.terminal_id == terminal_code,
+            PegepayOrder.order_no.like(f"{daily_prefix}%"),
+        )
+        .scalar()
+        or 0
+    )
+
+    next_number = terminal_daily_count + 1
+
+    # Minimum two digits:
+    # 1    -> 01
+    # 9    -> 09
+    # 10   -> 10
+    # 100  -> 100
+    # 1000 -> 1000
+    count_part = f"{next_number:02d}"
+
+    return (
+        f"TXN-{terminal_code}-"
+        f"{date_time_part}-"
+        f"{count_part}"
+    )
+    
 def get_pegepay_token(db: Session):
     """
     Return a valid Pegepay token (shared via DB).
@@ -159,48 +243,55 @@ def qr_guide():
 
 
 @router.post("/create-order")
-def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
-    terminal_code = body.terminal_id.strip()
-    terminal_prefix = f"TXN-{terminal_code}-"
+def create_order(
+    body: OrderCreateRequest,
+    db: Session = Depends(get_db),
+):
+    # Use a consistent cleaned terminal ID.
+    terminal_code = clean_terminal_id(body.terminal_id)
 
-    # ------------------ Check existing unprocessed order ------------------
+    # Take the current SIRIM time once for this request.
+    current_sirim_time = sirim_now_naive()
+    today_part = current_sirim_time.strftime("%Y%m%d")
+
+    # Only reuse an unprocessed order belonging to:
+    # 1. The same terminal
+    # 2. The current SIRIM date
+    current_day_prefix = (
+        f"TXN-{terminal_code}-{today_part}"
+    )
+
     existing_order = (
         db.query(PegepayOrder)
-        .filter(PegepayOrder.terminal_id == terminal_code)
-        .filter(PegepayOrder.order_status == "unprocessed")
+        .filter(
+            PegepayOrder.terminal_id == terminal_code,
+            PegepayOrder.order_status == "unprocessed",
+            PegepayOrder.order_no.like(
+                f"{current_day_prefix}%"
+            ),
+        )
         .order_by(PegepayOrder.id.desc())
         .first()
     )
 
     if existing_order:
         order_no = existing_order.order_no
-        print(f"Reusing unprocessed order: {order_no}")
-    else:
-        order_no = None
 
-    # ------------------ Generate new order if none ------------------
-    if not order_no:
-        last_order = (
-            db.query(PegepayOrder)
-            .filter(PegepayOrder.terminal_id == terminal_code)
-            .filter(PegepayOrder.order_no.like(f"{terminal_prefix}%"))
-            .order_by(PegepayOrder.id.desc())
-            .first()
+        print(
+            f"Reusing today's unprocessed order: "
+            f"{order_no} for terminal {terminal_code}"
+        )
+    else:
+        order_no = generate_pegepay_order_no(
+            db=db,
+            terminal_id=terminal_code,
+            current_time=current_sirim_time,
         )
 
-        if last_order and last_order.order_no.startswith(terminal_prefix):
-            try:
-                last_number = int(last_order.order_no.split("-")[-1])
-            except ValueError:
-                last_number = 0
-        else:
-            last_number = 0
-
-        next_number = last_number + 1
-        max_length = 15 - len(terminal_prefix)
-        order_no = f"{terminal_prefix}{str(next_number).zfill(max_length)}"[:15]
-
-        print(f"Creating new order: {order_no}")
+        print(
+            f"Creating new PegePay order: "
+            f"{order_no} for terminal {terminal_code}"
+        )
 
     payload = {
         "order_output": "online",
@@ -211,102 +302,129 @@ def create_order(body: OrderCreateRequest, db: Session = Depends(get_db)):
         "qr_validity": str(body.qr_validity),
         "store_id": body.store_id,
         "terminal_id": terminal_code,
-        "shift_id": body.shift_id
+        "shift_id": body.shift_id,
     }
 
     access_token = get_pegepay_token(db)
 
     headers = {
         "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
     }
 
-    # ------------------ Call PegePay ------------------
-    response = requests.post(PEPAY_ORDER_URL, json=payload, headers=headers)
+    # First PegePay request
+    response = requests.post(
+        PEPAY_ORDER_URL,
+        json=payload,
+        headers=headers,
+    )
 
-    # ------------------ If PegePay error ------------------
+    # If PegePay rejects the reused order, mark it successful
+    # and retry using a newly generated order number.
     if response.status_code != 200:
+        print(
+            "PegePay rejected the order. "
+            "Generating a new SIRIM-based order number."
+        )
 
-        print("PegePay rejected order. Assuming previous order already paid.")
-
-        # mark previous order successful
         if existing_order:
             existing_order.order_status = "successful"
             db.commit()
-            print(f"Marked order {existing_order.order_no} as successful")
 
-        # generate new order number
-        last_order = (
-            db.query(PegepayOrder)
-            .filter(PegepayOrder.terminal_id == terminal_code)
-            .filter(PegepayOrder.order_no.like(f"{terminal_prefix}%"))
-            .order_by(PegepayOrder.id.desc())
-            .first()
+            print(
+                f"Marked previous order "
+                f"{existing_order.order_no} as successful."
+            )
+
+        # Generate another number using the current SIRIM time.
+        retry_sirim_time = sirim_now_naive()
+
+        new_order_no = generate_pegepay_order_no(
+            db=db,
+            terminal_id=terminal_code,
+            current_time=retry_sirim_time,
         )
 
-        if last_order and last_order.order_no.startswith(terminal_prefix):
-            try:
-                last_number = int(last_order.order_no.split("-")[-1])
-            except ValueError:
-                last_number = 0
-        else:
-            last_number = 0
-
-        next_number = last_number + 1
-        max_length = 15 - len(terminal_prefix)
-
-        new_order_no = f"{terminal_prefix}{str(next_number).zfill(max_length)}"[:15]
-
-        print(f"Retrying with new order number: {new_order_no}")
+        print(
+            f"Retrying with new PegePay order number: "
+            f"{new_order_no}"
+        )
 
         payload["order_no"] = new_order_no
 
-        retry = requests.post(PEPAY_ORDER_URL, json=payload, headers=headers)
+        retry_response = requests.post(
+            PEPAY_ORDER_URL,
+            json=payload,
+            headers=headers,
+        )
 
-        if retry.status_code != 200:
-            raise HTTPException(status_code=retry.status_code, detail=retry.text)
+        if retry_response.status_code != 200:
+            raise HTTPException(
+                status_code=retry_response.status_code,
+                detail=retry_response.text,
+            )
 
-        res_data = retry.json()
-        iframe_url = res_data.get("content", {}).get("iframe_url")
+        response_data = retry_response.json()
+
+        iframe_url = (
+            response_data
+            .get("content", {})
+            .get("iframe_url")
+        )
 
         order_no = new_order_no
 
-        # save new order
         new_order = PegepayOrder(
             order_no=order_no,
             order_amount=body.order_amount,
             order_status="unprocessed",
             store_id=body.store_id,
-            terminal_id=terminal_code
+            terminal_id=terminal_code,
         )
+
         db.add(new_order)
         db.commit()
         db.refresh(new_order)
 
     else:
-        res_data = response.json()
-        iframe_url = res_data.get("content", {}).get("iframe_url")
+        response_data = response.json()
+
+        iframe_url = (
+            response_data
+            .get("content", {})
+            .get("iframe_url")
+        )
 
         if existing_order:
             existing_order.order_amount = body.order_amount
+            existing_order.store_id = body.store_id
+            existing_order.terminal_id = terminal_code
+
             db.commit()
+            db.refresh(existing_order)
+
         else:
             new_order = PegepayOrder(
                 order_no=order_no,
                 order_amount=body.order_amount,
                 order_status="unprocessed",
                 store_id=body.store_id,
-                terminal_id=terminal_code
+                terminal_id=terminal_code,
             )
+
             db.add(new_order)
             db.commit()
+            db.refresh(new_order)
 
     if not iframe_url:
-        raise HTTPException(status_code=500, detail="iframe_url missing")
+        raise HTTPException(
+            status_code=500,
+            detail="iframe_url missing from PegePay response",
+        )
 
     return {
         "iframe_url": iframe_url,
-        "order_no": order_no
+        "order_no": order_no,
     }
 
 
