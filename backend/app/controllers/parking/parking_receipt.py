@@ -3,8 +3,9 @@ from reportlab.lib.utils import ImageReader
 from reportlab.lib import colors
 from reportlab.pdfgen import canvas
 from io import BytesIO
-import datetime
+from datetime import datetime
 import os
+from app.utils.sirim_time import sirim_now_naive
 
 # === Preload logo once at startup for performance ===
 LOGO = None
@@ -25,8 +26,8 @@ def generate_parking_receipt(
     ticket_id: str,
     plate: str,
     hours: float,
-    time_in: datetime.datetime,
-    time_out: datetime.datetime,
+    time_in: datetime,
+    time_out: datetime,
     amount: float,
     transaction_type: str,
     order_no: str = None,
@@ -72,7 +73,7 @@ def generate_parking_receipt(
     c.drawCentredString(
         width / 2,
         text_after_logo_y - 18,
-        datetime.datetime.now().strftime("%d %b %Y, %I:%M %p"),
+        sirim_now_naive().strftime("%d %b %Y, %I:%M %p"),
     )
 
     # --- TABLE SECTION ---

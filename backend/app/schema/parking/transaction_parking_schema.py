@@ -14,7 +14,7 @@ class TransactionParking(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     terminal = Column(String(50), nullable=False)
-    ticket_id = Column(String(20), unique=True, index=True)  # e.g., P-0001
+    ticket_id = Column(String(100), unique=True, index=True)  # e.g., P-0001
     plate = Column(String(50), index=True)
     hours = Column(Float, nullable=False)  # total hours paid
     amount = Column(Float, nullable=False)
