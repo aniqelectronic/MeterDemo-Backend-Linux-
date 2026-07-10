@@ -109,22 +109,22 @@ def generate_pegepay_order_no(
     Generate a PegePay order number.
 
     Format:
-        TTTTDDMMYYCCCC
+        TTTTDDMMYYCCC
 
     Example:
-        KN081007260001
+        KN08100726001
 
     Breakdown:
         KN08   = terminal code
         100726 = 10 July 2026
-        0001   = first order for that terminal on that day
+        001   = first order for that terminal on that day
 
     Rules:
         - Uses SIRIM time as the first priority.
         - Counter is separate for each terminal.
         - Counter resets automatically when the SIRIM date changes.
-        - Supports 0001 until 9999.
-        - Maximum generated length is 14 characters.
+        - Supports 001 until 999.
+        - Maximum generated length is 13 characters.
         - PegePay maximum allowed length is 15 characters.
     """
 
@@ -155,7 +155,7 @@ def generate_pegepay_order_no(
 
     next_count = daily_count + 1
 
-    if next_count > 9999:
+    if next_count > 999:
         raise HTTPException(
             status_code=500,
             detail=(
@@ -164,7 +164,7 @@ def generate_pegepay_order_no(
             ),
         )
 
-    order_no = f"{prefix}{next_count:04d}"
+    order_no = f"{prefix}{next_count:03d}"
 
     # PegePay only allows a maximum of 15 characters.
     if len(order_no) > 15:
@@ -192,7 +192,7 @@ def generate_retry_order_no(
     database counter can generate the next number.
 
     If the first generated order has not yet been stored, manually
-    increase the final four-digit counter to prevent retrying with
+    increase the final three-digit counter to prevent retrying with
     the same order number.
     """
 
@@ -207,14 +207,14 @@ def generate_retry_order_no(
 
     # The first generated order was not saved in MySQL.
     # Increase its final four digits manually.
-    if len(previous_order_no) < 4:
+    if len(previous_order_no) < 3:
         raise HTTPException(
             status_code=500,
             detail="Invalid previous PegePay order number",
         )
 
     try:
-        current_count = int(previous_order_no[-4:])
+        current_count = int(previous_order_no[-3:])
     except ValueError as error:
         raise HTTPException(
             status_code=500,
@@ -226,7 +226,7 @@ def generate_retry_order_no(
 
     next_count = current_count + 1
 
-    if next_count > 9999:
+    if next_count > 999:
         raise HTTPException(
             status_code=500,
             detail=(
@@ -235,9 +235,9 @@ def generate_retry_order_no(
             ),
         )
 
-    order_prefix = previous_order_no[:-4]
+    order_prefix = previous_order_no[:-3]
     retry_order_no = (
-        f"{order_prefix}{next_count:04d}"
+        f"{order_prefix}{next_count:03d}"
     )
 
     if len(retry_order_no) > 15:
@@ -373,13 +373,13 @@ def create_order(
         TTTTDDMMYYCCCC
 
     Example:
-        KN081007260001
+        KN08100726001
 
     The order number:
         - Uses SIRIM time
         - Resets the sequence each new day
         - Has a separate sequence for each terminal
-        - Supports up to 9,999 orders per terminal per day
+        - Supports up to 999 orders per terminal per day
     """
 
     # Complete terminal ID for PegePay API.
