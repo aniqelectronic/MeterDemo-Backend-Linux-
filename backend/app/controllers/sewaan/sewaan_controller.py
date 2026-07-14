@@ -58,7 +58,7 @@ def generate_sewaan_receipt_bentong_html(
     return f"""
     <html>
     <head>
-        <title>Sewaan Receipt</title>
+        <title>Resit Sewaan / Sewaan Receipt</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
             body {{
@@ -111,8 +111,9 @@ def generate_sewaan_receipt_bentong_html(
                 background: #0057D9;
                 color: white;
                 padding: 12px;
-                font-size: 13px;
+                font-size: 12px;
                 text-align: left;
+                line-height: 1.4;
             }}
             td {{
                 padding: 11px;
@@ -158,14 +159,14 @@ def generate_sewaan_receipt_bentong_html(
         <div class="receipt">
             <div class="header">
                 <h1>MAJLIS PERBANDARAN BENTONG</h1>
-                <p>Rental / Sewaan Payment Receipt</p>
+                <p>Resit Bayaran Sewaan / Rental Payment Receipt</p>
             </div>
 
             <div class="info">
-                <div><b>Receipt No:</b> {order_no or "-"}</div>
-                <div><b>Paid Date:</b> {paid_date.strftime("%d %b %Y %I:%M %p")}</div>
-                <div><b>Payment Method:</b> {_safe(payment_method)}</div>
-                <div><b>Bank Transaction No:</b> {bank_trx_no or "-"}</div>
+                <div><b>No. Resit / Receipt No:</b> {order_no or "-"}</div>
+                <div><b>Tarikh Dibayar / Paid Date:</b> {paid_date.strftime("%d %b %Y %I:%M %p")}</div>
+                <div><b>Kaedah Pembayaran / Payment Method:</b> {_safe(payment_method)}</div>
+                <div><b>No. Transaksi Bank / Bank Transaction No:</b> {bank_trx_no or "-"}</div>
             </div>
 
             <div class="table-container">
@@ -173,13 +174,13 @@ def generate_sewaan_receipt_bentong_html(
                     <thead>
                         <tr>
                             <th>#</th>
-                            <th>Account No</th>
-                            <th>Tenant Name</th>
-                            <th>Premise Address</th>
-                            <th>Rental Period</th>
-                            <th>Outstanding Rent</th>
-                            <th>Current Rent</th>
-                            <th>Amount Paid</th>
+                            <th>No. Akaun<br>Account No</th>
+                            <th>Nama Penyewa<br>Tenant Name</th>
+                            <th>Alamat Premis<br>Premise Address</th>
+                            <th>Tempoh Sewaan<br>Rental Period</th>
+                            <th>Tunggakan Sewa<br>Outstanding Rent</th>
+                            <th>Sewa Semasa<br>Current Rent</th>
+                            <th>Jumlah Dibayar<br>Amount Paid</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -189,14 +190,15 @@ def generate_sewaan_receipt_bentong_html(
             </div>
 
             <div class="total">
-                Total Paid: RM {_format_money(total_amount)}
+                Jumlah Dibayar / Total Paid: RM {_format_money(total_amount)}
             </div>
 
             <div class="button">
-                <a href="{pdf_url}" target="_blank">Download PDF Receipt</a>
+                <a href="{pdf_url}" target="_blank">Muat Turun Resit PDF / Download PDF Receipt</a>
             </div>
 
             <div class="note">
+                Sila maklum bahawa kemas kini baki akaun mungkin diproses pada hari bekerja berikutnya. /
                 Please be informed that account balance updates may be processed on the following working day.
             </div>
         </div>

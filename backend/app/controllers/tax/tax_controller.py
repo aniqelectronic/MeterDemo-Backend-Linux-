@@ -149,10 +149,10 @@ def generate_tax_receipt_bentong_html(
         <tr>
             <td class="no">{index}</td>
             <td>
-                <div class="item-title">Assessment Tax</div>
-                <div>Account Number: {account_number}</div>
-                <div>Owner Name: {owner_name}</div>
-                <div>Property Address:</div>
+                <div class="item-title">Cukai Taksiran / Assessment Tax</div>
+                <div>Nombor Akaun / Account Number: {account_number}</div>
+                <div>Nama Pemilik / Owner Name: {owner_name}</div>
+                <div>Alamat Harta / Property Address:</div>
                 <div class="address">{property_address}</div>
             </td>
             <td class="amount">RM {amount:,.2f}</td>
@@ -162,14 +162,14 @@ def generate_tax_receipt_bentong_html(
     bank_html = ""
     if bank_trx_no:
         bank_html = f"""
-        <p><strong>Bank Transaction No:</strong> {html.escape(str(bank_trx_no))}</p>
+        <p><strong>No. Transaksi Bank / Bank Transaction No:</strong> {html.escape(str(bank_trx_no))}</p>
         """
 
     return f"""
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Bentong Tax Receipt</title>
+    <title>Resit Cukai Bentong / Bentong Tax Receipt</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <style>
@@ -331,20 +331,20 @@ def generate_tax_receipt_bentong_html(
             <h2>Majlis Perbandaran Bentong</h2>
             <p>Jalan Ketari</p>
             <p>28700 Bentong, Pahang Darul Makmur</p>
-            <p>Telephone : 04-5497555</p>
-            <p>Application : TIP Bentong</p>
+            <p>Telefon / Telephone : 04-5497555</p>
+            <p>Aplikasi / Application : TIP Bentong</p>
         </div>
 
         <div class="content">
             <div class="title-row">
                 <div>
-                    <h1>Receipt</h1>
+                    <h1>Resit / Receipt</h1>
                     <div class="receipt-no">#{html.escape(str(order_no))}</div>
                 </div>
 
                 <div class="meta">
-                    <p><strong>Paid at:</strong> {paid_date.strftime("%d %b %Y")}</p>
-                    <p><strong>Payment Method:</strong> {html.escape(str(payment_method))}</p>
+                    <p><strong>Dibayar pada / Paid at:</strong> {paid_date.strftime("%d %b %Y")}</p>
+                    <p><strong>Kaedah Pembayaran / Payment Method:</strong> {html.escape(str(payment_method))}</p>
                     {bank_html}
                 </div>
             </div>
@@ -353,8 +353,8 @@ def generate_tax_receipt_bentong_html(
                 <thead>
                     <tr>
                         <th>#</th>
-                        <th>Item</th>
-                        <th style="text-align:right;">Amount</th>
+                        <th>Butiran / Item</th>
+                        <th style="text-align:right;">Jumlah / Amount</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -367,18 +367,19 @@ def generate_tax_receipt_bentong_html(
             </div>
 
             <div class="note">
+                Sila maklum bahawa bagi pelanggan yang membuat pembayaran, kemas kini baki akaun akan diproses pada hari berikutnya. /
                 Please be informed that for customers making payments, the updating of account balances will be processed on the following day.
             </div>
 
             <div class="download">
-                <a href="{pdf_url}" target="_blank" download>Download PDF Receipt</a>
+                <a href="{pdf_url}" target="_blank" download>Muat Turun Resit PDF / Download PDF Receipt</a>
             </div>
         </div>
 
         <div class="footer">
             Majlis Perbandaran Bentong<br>
             Jalan Ketari, 28700 Bentong, Pahang Darul Makmur<br>
-            Telephone : 04-5497555 | Application : TIP Bentong
+            Telefon / Telephone : 04-5497555 | Aplikasi / Application : TIP Bentong
         </div>
     </div>
 </body>
@@ -668,7 +669,7 @@ def generate_multi_tax_receipt(payload: dict, db: Session = Depends(get_db)):
     html = f"""
     <html>
     <head>
-        <title>Tax Receipt</title>
+        <title>Resit Cukai / Tax Receipt</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
             body {{
@@ -689,7 +690,7 @@ def generate_multi_tax_receipt(payload: dict, db: Session = Depends(get_db)):
                 background: #2F80ED;
                 color: white;
                 padding: 18px;
-                font-size: 24px;
+                font-size: 22px;
                 text-align: center;
                 border-radius: 12px;
             }}
@@ -709,9 +710,10 @@ def generate_multi_tax_receipt(payload: dict, db: Session = Depends(get_db)):
                 background: #f5f8ff;
                 border-bottom: 2px solid #e0e0e0;
                 padding: 12px;
-                font-size: 16px;
+                font-size: 14px;
                 font-weight: bold;
                 text-align: center;
+                line-height: 1.4;
             }}
             td {{
                 padding: 12px;
@@ -745,16 +747,16 @@ def generate_multi_tax_receipt(payload: dict, db: Session = Depends(get_db)):
     <body>
 
     <div class="receipt">
-        <div class="header">Multiple Tax Receipt</div>
+        <div class="header">Resit Pelbagai Cukai / Multiple Tax Receipt</div>
 
         <div class="table-container">
             <table>
                 <thead>
                     <tr>
-                        <th>Bill No.</th>
-                        <th>Property Type</th>
-                        <th>Address</th>
-                        <th>Amount (RM)</th>
+                        <th>No. Bil<br>Bill No.</th>
+                        <th>Jenis Harta<br>Property Type</th>
+                        <th>Alamat<br>Address</th>
+                        <th>Jumlah (RM)<br>Amount (RM)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -764,11 +766,11 @@ def generate_multi_tax_receipt(payload: dict, db: Session = Depends(get_db)):
         </div>
 
         <div class="total">
-            Total: RM {float(total_amount):.2f}
+            Jumlah Keseluruhan / Total: RM {float(total_amount):.2f}
         </div>
 
         <div class="pdf-button">
-            <a href="{pdf_url}" target="_blank">Download PDF Receipt</a>
+            <a href="{pdf_url}" target="_blank">Muat Turun Resit PDF / Download PDF Receipt</a>
         </div>
     </div>
 
@@ -847,8 +849,3 @@ def pay_multiple_taxes(
             for t in updated_taxes
         ]
     }
-    
-    
-    
-    
-    

@@ -74,7 +74,7 @@ def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
     html = f"""
     <html>
         <head>
-            <title>Parking E-Receipt</title>
+            <title>E-Resit Parkir / Parking E-Receipt</title>
             <style>
                 body {{
                     font-family: Arial, sans-serif;
@@ -153,29 +153,29 @@ def view_receipt(ticket_id: str, db: Session = Depends(get_db)):
         </head>
         <body>
             <div class="receipt">
-                <h2>Parking E-Receipt</h2>
-                <p><b>Ticket ID:</b> {transaction.ticket_id}</p>
-                <p><b>Plate:</b> {transaction.plate}</p>
-                <p><b>Time In:</b> {parking.timein.strftime("%d/%m/%Y %H:%M %p") if parking and parking.timein else "N/A"}</p>
-                <p><b>Time Out:</b> {parking.timeout.strftime("%d/%m/%Y %H:%M %p") if parking and parking.timeout else "N/A"}</p>
-                <p><b>Amount:</b> 
+                <h2>E-Resit Parkir / Parking E-Receipt</h2>
+                <p><b>ID Tiket / Ticket ID:</b> {transaction.ticket_id}</p>
+                <p><b>Nombor Plat / Plate Number:</b> {transaction.plate}</p>
+                <p><b>Waktu Mula / Time In:</b> {parking.timein.strftime("%d/%m/%Y %H:%M %p") if parking and parking.timein else "N/A"}</p>
+                <p><b>Waktu Tamat / Time Out:</b> {parking.timeout.strftime("%d/%m/%Y %H:%M %p") if parking and parking.timeout else "N/A"}</p>
+                <p><b>Jumlah Bayaran / Amount:</b> 
                     <span style="font-size:38px; font-weight:bold; color:#000;">
                         RM {transaction.amount:.2f}
                     </span>
                 </p>
-                <p><b>Transaction Type:</b> {transaction.transaction_type if transaction else "N/A"}</p>
-                <p><b>Order No:</b> {transaction.order_no if transaction and transaction.order_no else "N/A"}</p>
-                <p><b>Bank Transaction No:</b> {transaction.bank_trx_no if transaction and transaction.bank_trx_no else "N/A"}</p>
+                <p><b>Jenis Transaksi / Transaction Type:</b> {transaction.transaction_type if transaction else "N/A"}</p>
+                <p><b>No. Pesanan / Order No:</b> {transaction.order_no if transaction and transaction.order_no else "N/A"}</p>
+                <p><b>No. Transaksi Bank / Bank Transaction No:</b> {transaction.bank_trx_no if transaction and transaction.bank_trx_no else "N/A"}</p>
     
-                <div class="thankyou">Thank you! Drive safely </div>
+                <div class="thankyou">Terima kasih! Pandu dengan selamat.<br><small>Thank you! Drive safely.</small></div>
     
                 <div class="download-btn">
                     <a href="{pdf_url}" target="_blank">
-                        Download PDF
+                        Muat Turun PDF / Download PDF
                     </a>
                 </div>
     
-                <div class="footer">&copy; 2025 City Car Park System &bull; All Rights Reserved</div>
+                <div class="footer">&copy; 2025 City Car Park System &bull; Hak Cipta Terpelihara / All Rights Reserved</div>
             </div>
         </body>
     </html>
@@ -261,12 +261,12 @@ def get_latest_qr(db: Session = Depends(get_db)):
         
     html = f"""
     <!DOCTYPE html>
-      <html lang="en">
+      <html lang="ms">
         <head>
           <meta charset="utf-8" />
           <meta name="color-scheme" content="only light" />
           <meta name="supported-color-schemes" content="light" />
-          <title>Parking E-Receipt</title>
+          <title>E-Resit Parkir / Parking E-Receipt</title>
           <style>
             html {{
               color-scheme: only light;
@@ -388,29 +388,29 @@ def get_latest_qr(db: Session = Depends(get_db)):
         <body>
           <div class="receipt">
             <div class="header">
-              <h1>Parking E-Receipt</h1>
-              <p><small>Issued by City Car Park System</small></p>
+              <h1>E-Resit Parkir / Parking E-Receipt</h1>
+              <p><small>Dikeluarkan oleh / Issued by City Car Park System</small></p>
             </div>
   
             <div class="details">
-              <p><b>Ticket ID:</b> <span>{tx.ticket_id}</span></p>
-              <p><b>Plate Number:</b> <span>{tx.plate}</span></p>
-              <p><b>Duration (Hours):</b> <span>{tx.hours}</span></p>
-              <p><b>Time In:</b> {parking.timein.strftime("%d/%m/%Y %H:%M %p") if parking and parking.timein else "N/A"}</p>
-              <p><b>Time Out:</b> {parking.timeout.strftime("%d/%m/%Y %H:%M %p") if parking and parking.timeout else "N/A"}</p>
-              <p><b>Transaction Type:</b> <span>{tx.transaction_type if tx else "N/A"}</span></p>
-              <p><b>Order No:</b> <span>{tx.order_no if tx and tx.order_no else "N/A"}</span></p>
-              <p><b>Bank Transaction No:</b> <span>{tx.bank_trx_no if tx and tx.bank_trx_no else "N/A"}</span></p>
+              <p><b>ID Tiket / Ticket ID:</b> <span>{tx.ticket_id}</span></p>
+              <p><b>Nombor Plat / Plate Number:</b> <span>{tx.plate}</span></p>
+              <p><b>Tempoh (Jam) / Duration (Hours):</b> <span>{tx.hours}</span></p>
+              <p><b>Waktu Mula / Time In:</b> {parking.timein.strftime("%d/%m/%Y %H:%M %p") if parking and parking.timein else "N/A"}</p>
+              <p><b>Waktu Tamat / Time Out:</b> {parking.timeout.strftime("%d/%m/%Y %H:%M %p") if parking and parking.timeout else "N/A"}</p>
+              <p><b>Jenis Transaksi / Transaction Type:</b> <span>{tx.transaction_type if tx else "N/A"}</span></p>
+              <p><b>No. Pesanan / Order No:</b> <span>{tx.order_no if tx and tx.order_no else "N/A"}</span></p>
+              <p><b>No. Transaksi Bank / Bank Transaction No:</b> <span>{tx.bank_trx_no if tx and tx.bank_trx_no else "N/A"}</span></p>
             </div>
   
-            <div class="amount">Total Paid: <span>RM {tx.amount:.2f}</span></div>
+            <div class="amount">Jumlah Dibayar / Total Paid: <span>RM {tx.amount:.2f}</span></div>
   
-            <div class="thankyou">Thank you for choosing City Car Park</div>
+            <div class="thankyou">Terima kasih kerana memilih City Car Park<br><small>Thank you for choosing City Car Park</small></div>
   
             <div class="download-btn">
-              <a href="{pdf_url}" target="_blank">Download PDF</a>
+              <a href="{pdf_url}" target="_blank">Muat Turun PDF / Download PDF</a>
             </div>
-             <div class="footer">&copy; 2025 City Car Park System &bull; All Rights Reserved</div>
+             <div class="footer">&copy; 2025 City Car Park System &bull; Hak Cipta Terpelihara / All Rights Reserved</div>
           </div>
         </body>
       </html>

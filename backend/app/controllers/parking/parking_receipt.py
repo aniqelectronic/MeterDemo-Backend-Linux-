@@ -22,6 +22,27 @@ except Exception as e:
     print(f"[WARN] Failed to load logo: {e}")
 
 
+# =========================================================
+# BILINGUAL LABELS (Bahasa Malaysia / English)
+# =========================================================
+
+L = {
+    "doc_title": "E-RESIT PARKING / PARKING E-RECEIPT",
+    "table_title": "Butiran Parkir / Parking Details",
+    "ticket_id": "No. Tiket / Ticket ID",
+    "plate": "No. Plat / Plate Number",
+    "duration": "Tempoh Parkir / Parking Duration",
+    "time_in": "Masa Masuk / Time In",
+    "time_out": "Masa Keluar / Time Out",
+    "transaction_type": "Jenis Transaksi / Transaction Type",
+    "amount_paid": "Jumlah Dibayar (RM) / Amount Paid (RM)",
+    "order_no": "No. Pesanan / Order No",
+    "bank_trx": "No. Transaksi Bank / Bank Transaction No",
+    "footer_thanks": "Terima kasih kerana meletak kenderaan bersama kami. / Thank you for parking with us.",
+    "footer_safe": "Semoga perjalanan anda selamat! / Have a safe journey!",
+}
+
+
 def generate_parking_receipt(
     ticket_id: str,
     plate: str,
@@ -63,36 +84,36 @@ def generate_parking_receipt(
             print(f"[WARN] Failed to draw logo: {e}")
 
     # Title
-    c.setFont("Helvetica-Bold", 20)
+    c.setFont("Helvetica-Bold", 16)
     c.setFillColor(colors.HexColor("#222222"))
-    c.drawCentredString(width / 2, text_after_logo_y, "PARKING E-RECEIPT")
+    c.drawCentredString(width / 2, text_after_logo_y, L["doc_title"])
 
     # Date
     c.setFont("Helvetica", 12)
     c.setFillColor(colors.grey)
     c.drawCentredString(
         width / 2,
-        text_after_logo_y - 18,
+        text_after_logo_y - 20,
         sirim_now_naive().strftime("%d %b %Y, %I:%M %p"),
     )
 
     # --- TABLE SECTION ---
-    y = text_after_logo_y - 70
+    y = text_after_logo_y - 72
     table_left = 60
     table_right = width - 60
     row_height = 30
     corner_radius = 10
 
     details = [
-        ("Ticket ID", ticket_id),
-        ("Plate Number", plate),
-        ("Parking Duration", f"{hours:.2f} hour(s)"),
-        ("Time In", time_in.replace(second=0, microsecond=0).strftime("%d/%m/%Y %I:%M %p")),
-        ("Time Out", time_out.replace(second=0, microsecond=0).strftime("%d/%m/%Y %I:%M %p")),
-        ("Transaction Type", transaction_type.capitalize()),
-        ("Amount Paid (RM)", f"{amount:.2f}"),
-        ("Order No", order_no if order_no else "N/A"),
-        ("Bank Transaction No", bank_trx_no if bank_trx_no else "N/A"),
+        (L["ticket_id"], ticket_id),
+        (L["plate"], plate),
+        (L["duration"], f"{hours:.2f} hour(s)"),
+        (L["time_in"], time_in.replace(second=0, microsecond=0).strftime("%d/%m/%Y %I:%M %p")),
+        (L["time_out"], time_out.replace(second=0, microsecond=0).strftime("%d/%m/%Y %I:%M %p")),
+        (L["transaction_type"], transaction_type.capitalize()),
+        (L["amount_paid"], f"{amount:.2f}"),
+        (L["order_no"], order_no if order_no else "N/A"),
+        (L["bank_trx"], bank_trx_no if bank_trx_no else "N/A"),
     ]
 
     total_rows = len(details) + 1  # header row included
@@ -125,9 +146,9 @@ def generate_parking_receipt(
     # Table header row
     c.setFillColor(colors.HexColor("#F2F2F2"))
     c.rect(table_left, y - row_height, (table_right - table_left), row_height, fill=True, stroke=False)
-    c.setFont("Helvetica-Bold", 13)
+    c.setFont("Helvetica-Bold", 12)
     c.setFillColor(colors.black)
-    c.drawString(table_left + 12, y - row_height + 8, "Parking Details")
+    c.drawString(table_left + 12, y - row_height + 8, L["table_title"])
 
     y -= row_height
 
@@ -142,7 +163,7 @@ def generate_parking_receipt(
         c.rect(table_left, y - row_height, (table_right - table_left), row_height, fill=True, stroke=False)
 
         # Label
-        c.setFont("Helvetica-Bold", 11)
+        c.setFont("Helvetica-Bold", 10)
         c.setFillColor(colors.HexColor("#222222"))
         c.drawString(table_left + 15, y - row_height + 9, label)
 
@@ -157,10 +178,10 @@ def generate_parking_receipt(
     c.setStrokeColor(colors.grey)
     c.line(60, 100, width - 60, 100)
 
-    c.setFont("Helvetica-Oblique", 10)
+    c.setFont("Helvetica-Oblique", 9)
     c.setFillColor(colors.grey)
-    c.drawCentredString(width / 2, 80, "Thank you for parking with us.")
-    c.drawCentredString(width / 2, 65, "Have a safe journey!")
+    c.drawCentredString(width / 2, 80, L["footer_thanks"])
+    c.drawCentredString(width / 2, 65, L["footer_safe"])
 
     # Finalize PDF
     c.showPage()
