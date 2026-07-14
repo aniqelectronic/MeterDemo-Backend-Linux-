@@ -22,9 +22,14 @@ try:
     if os.path.exists(BENTONG_LOGO_PATH):
         with open(BENTONG_LOGO_PATH, "rb") as f:
             BENTONG_LOGO = ImageReader(BytesIO(f.read()))
+
         print("[INFO] Bentong logo preloaded successfully.")
     else:
-        print(f"[WARN] Bentong logo not found at: {BENTONG_LOGO_PATH}")
+        print(
+            f"[WARN] Bentong logo not found at: "
+            f"{BENTONG_LOGO_PATH}"
+        )
+
 except Exception as e:
     print(f"[WARN] Failed to load Bentong logo: {e}")
 
@@ -33,9 +38,14 @@ try:
     if os.path.exists(COMPANY_LOGO_PATH):
         with open(COMPANY_LOGO_PATH, "rb") as f:
             COMPANY_LOGO = ImageReader(BytesIO(f.read()))
+
         print("[INFO] Company logo preloaded successfully.")
     else:
-        print(f"[WARN] Company logo not found at: {COMPANY_LOGO_PATH}")
+        print(
+            f"[WARN] Company logo not found at: "
+            f"{COMPANY_LOGO_PATH}"
+        )
+
 except Exception as e:
     print(f"[WARN] Failed to load company logo: {e}")
 
@@ -46,9 +56,16 @@ except Exception as e:
 
 def _format_money(value):
     try:
-        return f"{float(value):,.2f}"
-    except Exception:
+        return f"{float(value or 0):,.2f}"
+    except (TypeError, ValueError):
         return "0.00"
+
+
+def _safe_float(value):
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _safe_text(value):
@@ -63,50 +80,87 @@ def _format_date(value):
     try:
         if isinstance(value, datetime.datetime):
             return value.strftime("%d %b %Y")
+
         if isinstance(value, datetime.date):
             return value.strftime("%d %b %Y")
 
-        dt = datetime.datetime.strptime(str(value), "%Y-%m-%d")
-        return dt.strftime("%d %b %Y")
+        parsed_date = datetime.datetime.strptime(
+            str(value),
+            "%Y-%m-%d",
+        )
+
+        return parsed_date.strftime("%d %b %Y")
+
     except Exception:
         return str(value)
 
 
 def _build_address(*parts):
     cleaned = []
+
     for part in parts:
         part = str(part or "").strip()
+
         if part:
             cleaned.append(part)
+
     return ", ".join(cleaned) if cleaned else "-"
 
 
-def _wrap_text_lines(c, text, max_width, font_name="Helvetica", font_size=9):
+def _wrap_text_lines(
+    c,
+    text,
+    max_width,
+    font_name="Helvetica",
+    font_size=9,
+):
     words = str(text or "-").split()
     lines = []
-    line = ""
+    current_line = ""
 
     for word in words:
-        test_line = f"{line} {word}".strip()
-        if c.stringWidth(test_line, font_name, font_size) <= max_width:
-            line = test_line
-        else:
-            if line:
-                lines.append(line)
-            line = word
+        test_line = f"{current_line} {word}".strip()
 
-    if line:
-        lines.append(line)
+        if (
+            c.stringWidth(
+                test_line,
+                font_name,
+                font_size,
+            )
+            <= max_width
+        ):
+            current_line = test_line
+
+        else:
+            if current_line:
+                lines.append(current_line)
+
+            current_line = word
+
+    if current_line:
+        lines.append(current_line)
 
     return lines if lines else ["-"]
 
 
-def _draw_image_keep_ratio(c, img, x, y, max_width, max_height):
+def _draw_image_keep_ratio(
+    c,
+    img,
+    x,
+    y,
+    max_width,
+    max_height,
+):
     try:
-        img_width, img_height = img.getSize()
-        ratio = min(max_width / img_width, max_height / img_height)
-        draw_width = img_width * ratio
-        draw_height = img_height * ratio
+        image_width, image_height = img.getSize()
+
+        ratio = min(
+            max_width / image_width,
+            max_height / image_height,
+        )
+
+        draw_width = image_width * ratio
+        draw_height = image_height * ratio
 
         c.drawImage(
             img,
@@ -116,115 +170,560 @@ def _draw_image_keep_ratio(c, img, x, y, max_width, max_height):
             height=draw_height,
             mask="auto",
         )
+
     except Exception as e:
         print(f"[WARN] Failed to draw image: {e}")
 
 
+def _draw_bilingual_left(
+    c,
+    malay,
+    english,
+    x,
+    y,
+    malay_size=9,
+    english_size=8,
+    malay_color=colors.black,
+    english_color=colors.HexColor("#666666"),
+    line_gap=11,
+):
+    c.setFillColor(malay_color)
+    c.setFont("Helvetica-Bold", malay_size)
+    c.drawString(x, y, str(malay))
+
+    c.setFillColor(english_color)
+    c.setFont("Helvetica-Oblique", english_size)
+    c.drawString(x, y - line_gap, str(english))
+
+    return y - line_gap - 3
+
+
+def _draw_bilingual_right(
+    c,
+    malay,
+    english,
+    x,
+    y,
+    malay_size=9,
+    english_size=8,
+    malay_color=colors.black,
+    english_color=colors.HexColor("#666666"),
+    line_gap=11,
+):
+    c.setFillColor(malay_color)
+    c.setFont("Helvetica-Bold", malay_size)
+    c.drawRightString(x, y, str(malay))
+
+    c.setFillColor(english_color)
+    c.setFont("Helvetica-Oblique", english_size)
+    c.drawRightString(x, y - line_gap, str(english))
+
+    return y - line_gap - 3
+
+
+def _draw_bilingual_center(
+    c,
+    malay,
+    english,
+    x,
+    y,
+    malay_size=9,
+    english_size=8,
+    malay_color=colors.black,
+    english_color=colors.HexColor("#666666"),
+    line_gap=11,
+):
+    c.setFillColor(malay_color)
+    c.setFont("Helvetica-Bold", malay_size)
+    c.drawCentredString(x, y, str(malay))
+
+    c.setFillColor(english_color)
+    c.setFont("Helvetica-Oblique", english_size)
+    c.drawCentredString(x, y - line_gap, str(english))
+
+    return y - line_gap - 3
+
+
+def _draw_bilingual_label_value(
+    c,
+    malay_label,
+    english_label,
+    value,
+    x,
+    y,
+    max_width,
+    label_width=135,
+    malay_size=8.5,
+    english_size=7.5,
+    value_size=8.5,
+    malay_color=colors.HexColor("#222222"),
+    english_color=colors.HexColor("#666666"),
+):
+    c.setFillColor(malay_color)
+    c.setFont("Helvetica-Bold", malay_size)
+    c.drawString(x, y, str(malay_label))
+
+    c.setFillColor(english_color)
+    c.setFont("Helvetica-Oblique", english_size)
+    c.drawString(x, y - 10, str(english_label))
+
+    value_x = x + label_width
+    value_width = max_width - label_width
+
+    value_lines = _wrap_text_lines(
+        c,
+        value,
+        value_width,
+        "Helvetica",
+        value_size,
+    )
+
+    c.setFillColor(colors.HexColor("#222222"))
+    c.setFont("Helvetica", value_size)
+
+    value_y = y
+
+    for line in value_lines:
+        c.drawString(
+            value_x,
+            value_y,
+            line,
+        )
+        value_y -= 11
+
+    used_height = max(
+        22,
+        len(value_lines) * 11,
+    )
+
+    return y - used_height
+
+
+def _draw_bilingual_wrapped_center(
+    c,
+    malay_text,
+    english_text,
+    center_x,
+    y,
+    max_width,
+    malay_size=7,
+    english_size=7,
+    line_height=9,
+):
+    malay_lines = _wrap_text_lines(
+        c,
+        malay_text,
+        max_width,
+        "Helvetica-Bold",
+        malay_size,
+    )
+
+    c.setFillColor(colors.HexColor("#666666"))
+    c.setFont("Helvetica-Bold", malay_size)
+
+    for line in malay_lines:
+        c.drawCentredString(
+            center_x,
+            y,
+            line,
+        )
+        y -= line_height
+
+    y -= 2
+
+    english_lines = _wrap_text_lines(
+        c,
+        english_text,
+        max_width,
+        "Helvetica-Oblique",
+        english_size,
+    )
+
+    c.setFont("Helvetica-Oblique", english_size)
+
+    for line in english_lines:
+        c.drawCentredString(
+            center_x,
+            y,
+            line,
+        )
+        y -= line_height
+
+    return y
+
+
 # =========================================================
-# BILINGUAL LABELS (Bahasa Malaysia / English)
+# BILINGUAL LABELS
+# MALAY BOLD / ENGLISH ITALIC
 # =========================================================
 
 L = {
-    "title": "MAJLIS PERBANDARAN BENTONG",
-    "doc_title": "RESIT BAYARAN SEWAAN / RENTAL PAYMENT RECEIPT",
-    "generated_by": "Dijana oleh / Generated by TIP Bentong",
-    "receipt": "Resit / Receipt",
-    "paid_at": "Dibayar pada / Paid at",
-    "payment_method": "Kaedah Pembayaran / Payment Method",
-    "bank_trx": "No. Transaksi Bank / Bank Transaction No",
-    "table_col_hash": "#",
-    "table_col_detail": "Butiran Sewaan / Rental Details",
-    "table_col_amount": "Jumlah Dibayar / Amount Paid",
-    "row_title": "Sewaan / Rental",
-    "account_number": "Nombor Akaun / Account Number",
-    "old_account_number": "Nombor Akaun Lama / Old Account Number",
-    "tenant_name": "Nama Penyewa / Tenant Name",
-    "registration_no": "No. Pendaftaran / Registration No",
-    "rental_period": "Tempoh Sewaan / Rental Period",
-    "premise_address": "Alamat Premis / Premise Address",
-    "mailing_address": "Alamat Surat-Menyurat / Mailing Address",
-    "outstanding_rent": "Tunggakan Sewa / Outstanding Rent",
-    "current_rent": "Sewa Semasa / Current Rental Fee",
-    "water_charge": "Caj Air / Water Charge",
-    "electric_charge": "Caj Elektrik / Electric Charge",
-    "management_charge": "Caj Pengurusan / Management Charge",
-    "total_paid": "Jumlah Dibayar / Total Paid",
-    "reminder": "Sila maklum bahawa kemas kini baki akaun mungkin diproses pada hari bekerja berikutnya. / "
-                "Please be informed that account balance updates may be processed on the following working day.",
-    "footer_name": "Majlis Perbandaran Bentong",
-    "footer_address": "Jalan Ketari, 28700 Bentong, Pahang Darul Makmur",
-    "footer_contact": "Telefon / Telephone : 04-5497555 | Aplikasi / Application : TIP Bentong",
+    "title_ms": "MAJLIS PERBANDARAN BENTONG",
+    "title_en": "BENTONG MUNICIPAL COUNCIL",
+
+    "doc_title_ms": "RESIT BAYARAN SEWAAN",
+    "doc_title_en": "RENTAL PAYMENT RECEIPT",
+
+    "generated_by_ms": "Dijana oleh TIP Bentong",
+    "generated_by_en": "Generated by TIP Bentong",
+
+    "receipt_ms": "Resit",
+    "receipt_en": "Receipt",
+
+    "paid_at_ms": "Dibayar pada",
+    "paid_at_en": "Paid at",
+
+    "payment_method_ms": "Kaedah Pembayaran",
+    "payment_method_en": "Payment Method",
+
+    "bank_trx_ms": "No. Transaksi Bank",
+    "bank_trx_en": "Bank Transaction No.",
+
+    "table_col_hash_ms": "Bil.",
+    "table_col_hash_en": "No.",
+
+    "table_col_detail_ms": "Butiran Sewaan",
+    "table_col_detail_en": "Rental Details",
+
+    "table_col_amount_ms": "Jumlah Dibayar",
+    "table_col_amount_en": "Amount Paid",
+
+    "row_title_ms": "Sewaan",
+    "row_title_en": "Rental",
+
+    "account_number_ms": "Nombor Akaun",
+    "account_number_en": "Account Number",
+
+    "old_account_number_ms": "Nombor Akaun Lama",
+    "old_account_number_en": "Old Account Number",
+
+    "tenant_name_ms": "Nama Penyewa",
+    "tenant_name_en": "Tenant Name",
+
+    "registration_no_ms": "No. Pendaftaran",
+    "registration_no_en": "Registration No.",
+
+    "rental_period_ms": "Tempoh Sewaan",
+    "rental_period_en": "Rental Period",
+
+    "premise_address_ms": "Alamat Premis",
+    "premise_address_en": "Premise Address",
+
+    "mailing_address_ms": "Alamat Surat-Menyurat",
+    "mailing_address_en": "Mailing Address",
+
+    "outstanding_rent_ms": "Tunggakan Sewa",
+    "outstanding_rent_en": "Outstanding Rent",
+
+    "current_rent_ms": "Sewa Semasa",
+    "current_rent_en": "Current Rental Fee",
+
+    "water_charge_ms": "Caj Air",
+    "water_charge_en": "Water Charge",
+
+    "electric_charge_ms": "Caj Elektrik",
+    "electric_charge_en": "Electric Charge",
+
+    "management_charge_ms": "Caj Pengurusan",
+    "management_charge_en": "Management Charge",
+
+    "total_paid_ms": "Jumlah Dibayar",
+    "total_paid_en": "Total Paid",
+
+    "reminder_ms": (
+        "Sila maklum bahawa kemas kini baki akaun mungkin "
+        "diproses pada hari bekerja berikutnya."
+    ),
+
+    "reminder_en": (
+        "Please be informed that account balance updates "
+        "may be processed on the following working day."
+    ),
+
+    "footer_name_ms": "Majlis Perbandaran Bentong",
+    "footer_name_en": "Bentong Municipal Council",
+
+    "footer_address": (
+        "Jalan Ketari, 28700 Bentong, "
+        "Pahang Darul Makmur"
+    ),
+
+    "footer_contact_ms": (
+        "Telefon: 04-5497555 | "
+        "Aplikasi: TIP Bentong"
+    ),
+
+    "footer_contact_en": (
+        "Telephone: 04-5497555 | "
+        "Application: TIP Bentong"
+    ),
 }
 
 
-def _draw_page_header(c, width, height, primary_blue, secondary_blue, light_blue):
+# =========================================================
+# PAGE HEADER
+# =========================================================
+
+def _draw_page_header(
+    c,
+    width,
+    height,
+    primary_blue,
+    secondary_blue,
+    light_blue,
+):
     header_height = 155
 
     c.setFillColor(primary_blue)
-    c.rect(0, height - header_height, width, header_height, fill=True, stroke=False)
-
-    c.setFillColor(secondary_blue)
-    c.rect(0, height - 38, width, 38, fill=True, stroke=False)
-
-    c.setFillColor(light_blue)
-    c.rect(0, height - 12, width, 12, fill=True, stroke=False)
-
-    c.setFillColor(colors.HexColor("#002B6B"))
-    c.rect(0, height - header_height, width, 38, fill=True, stroke=False)
-
-    if BENTONG_LOGO:
-        _draw_image_keep_ratio(c, BENTONG_LOGO, 35, height - 122, 85, 85)
-
-    if COMPANY_LOGO:
-        _draw_image_keep_ratio(c, COMPANY_LOGO, width - 120, height - 112, 120, 70)
-
-    c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 16)
-    c.drawCentredString(width / 2, height - 52, L["title"])
-
-    c.setFont("Helvetica", 9)
-    c.drawCentredString(
-        width / 2,
-        height - 70,
-        "Jalan Ketari, 28700 Bentong, Pahang Darul Makmur",
+    c.rect(
+        0,
+        height - header_height,
+        width,
+        header_height,
+        fill=True,
+        stroke=False,
     )
 
-    c.setFont("Helvetica-Bold", 9)
-    c.drawCentredString(width / 2, height - 91, L["doc_title"])
+    c.setFillColor(secondary_blue)
+    c.rect(
+        0,
+        height - 38,
+        width,
+        38,
+        fill=True,
+        stroke=False,
+    )
 
-    c.setFont("Helvetica", 8)
-    c.drawCentredString(width / 2, height - 108, L["generated_by"])
+    c.setFillColor(light_blue)
+    c.rect(
+        0,
+        height - 12,
+        width,
+        12,
+        fill=True,
+        stroke=False,
+    )
 
-
-def _draw_footer(c, width, primary_blue, grey_text):
-    c.setStrokeColor(colors.HexColor("#D9E8FF"))
-    c.line(45, 82, width - 45, 82)
+    c.setFillColor(colors.HexColor("#002B6B"))
+    c.rect(
+        0,
+        height - header_height,
+        width,
+        38,
+        fill=True,
+        stroke=False,
+    )
 
     if BENTONG_LOGO:
-        _draw_image_keep_ratio(c, BENTONG_LOGO, 50, 25, 35, 35)
+        _draw_image_keep_ratio(
+            c,
+            BENTONG_LOGO,
+            35,
+            height - 122,
+            85,
+            85,
+        )
 
     if COMPANY_LOGO:
-        _draw_image_keep_ratio(c, COMPANY_LOGO, width - 70, 25, 55, 35)
+        _draw_image_keep_ratio(
+            c,
+            COMPANY_LOGO,
+            width - 120,
+            height - 112,
+            120,
+            70,
+        )
 
-    c.setFillColor(primary_blue)
-    c.setFont("Helvetica-Bold", 8)
-    c.drawCentredString(width / 2, 62, L["footer_name"])
-
-    c.setFillColor(grey_text)
-    c.setFont("Helvetica", 8)
-    c.drawCentredString(width / 2, 48, L["footer_address"])
-    c.drawCentredString(width / 2, 34, L["footer_contact"])
-
-
-def _draw_table_header(c, y, table_left, table_right, table_width, secondary_blue):
-    c.setFillColor(secondary_blue)
-    c.roundRect(table_left, y, table_width, 36, 12, fill=True, stroke=False)
+    _draw_bilingual_center(
+        c,
+        L["title_ms"],
+        L["title_en"],
+        width / 2,
+        height - 48,
+        malay_size=15,
+        english_size=9,
+        malay_color=colors.white,
+        english_color=colors.white,
+        line_gap=15,
+    )
 
     c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(table_left + 18, y + 12, L["table_col_hash"])
-    c.drawString(table_left + 55, y + 12, L["table_col_detail"])
-    c.drawRightString(table_right - 18, y + 12, L["table_col_amount"])
+    c.setFont("Helvetica", 8)
+
+    c.drawCentredString(
+        width / 2,
+        height - 79,
+        L["footer_address"],
+    )
+
+    _draw_bilingual_center(
+        c,
+        L["doc_title_ms"],
+        L["doc_title_en"],
+        width / 2,
+        height - 98,
+        malay_size=10,
+        english_size=8,
+        malay_color=colors.white,
+        english_color=colors.white,
+        line_gap=12,
+    )
+
+    _draw_bilingual_center(
+        c,
+        L["generated_by_ms"],
+        L["generated_by_en"],
+        width / 2,
+        height - 125,
+        malay_size=8,
+        english_size=7,
+        malay_color=colors.white,
+        english_color=colors.white,
+        line_gap=10,
+    )
+
+
+# =========================================================
+# FOOTER
+# =========================================================
+
+def _draw_footer(
+    c,
+    width,
+    primary_blue,
+    grey_text,
+):
+    c.setStrokeColor(
+        colors.HexColor("#D9E8FF")
+    )
+
+    c.line(
+        45,
+        88,
+        width - 45,
+        88,
+    )
+
+    if BENTONG_LOGO:
+        _draw_image_keep_ratio(
+            c,
+            BENTONG_LOGO,
+            50,
+            25,
+            35,
+            35,
+        )
+
+    if COMPANY_LOGO:
+        _draw_image_keep_ratio(
+            c,
+            COMPANY_LOGO,
+            width - 100,
+            25,
+            55,
+            35,
+        )
+
+    _draw_bilingual_center(
+        c,
+        L["footer_name_ms"],
+        L["footer_name_en"],
+        width / 2,
+        69,
+        malay_size=8,
+        english_size=7,
+        malay_color=primary_blue,
+        english_color=grey_text,
+        line_gap=10,
+    )
+
+    c.setFillColor(grey_text)
+    c.setFont("Helvetica", 7.5)
+
+    c.drawCentredString(
+        width / 2,
+        45,
+        L["footer_address"],
+    )
+
+    _draw_bilingual_center(
+        c,
+        L["footer_contact_ms"],
+        L["footer_contact_en"],
+        width / 2,
+        33,
+        malay_size=7,
+        english_size=6.5,
+        malay_color=grey_text,
+        english_color=grey_text,
+        line_gap=9,
+    )
+
+
+# =========================================================
+# TABLE HEADER
+# =========================================================
+
+def _draw_table_header(
+    c,
+    y,
+    table_left,
+    table_right,
+    table_width,
+    secondary_blue,
+):
+    header_height = 44
+
+    c.setFillColor(secondary_blue)
+
+    c.roundRect(
+        table_left,
+        y,
+        table_width,
+        header_height,
+        12,
+        fill=True,
+        stroke=False,
+    )
+
+    _draw_bilingual_left(
+        c,
+        L["table_col_hash_ms"],
+        L["table_col_hash_en"],
+        table_left + 18,
+        y + 26,
+        malay_size=9,
+        english_size=8,
+        malay_color=colors.white,
+        english_color=colors.white,
+        line_gap=11,
+    )
+
+    _draw_bilingual_left(
+        c,
+        L["table_col_detail_ms"],
+        L["table_col_detail_en"],
+        table_left + 55,
+        y + 26,
+        malay_size=9,
+        english_size=8,
+        malay_color=colors.white,
+        english_color=colors.white,
+        line_gap=11,
+    )
+
+    _draw_bilingual_right(
+        c,
+        L["table_col_amount_ms"],
+        L["table_col_amount_en"],
+        table_right - 18,
+        y + 26,
+        malay_size=9,
+        english_size=8,
+        malay_color=colors.white,
+        english_color=colors.white,
+        line_gap=11,
+    )
 
 
 # =========================================================
@@ -233,12 +732,36 @@ def _draw_table_header(c, y, table_left, table_right, table_width, secondary_blu
 
 def build_sewaan_receipt_item_from_api(data):
     return {
-        "account_number": data.get("account_no", "-"),
-        "old_account_number": data.get("old_account_no", "-"),
-        "tenant_name": data.get("name", "-"),
-        "registration_no": data.get("rent_pdaftaran", "-"),
-        "start_date": data.get("start_date", "-"),
-        "end_date": data.get("end_date", "-"),
+        "account_number": data.get(
+            "account_no",
+            "-",
+        ),
+
+        "old_account_number": data.get(
+            "old_account_no",
+            "-",
+        ),
+
+        "tenant_name": data.get(
+            "name",
+            "-",
+        ),
+
+        "registration_no": data.get(
+            "rent_pdaftaran",
+            "-",
+        ),
+
+        "start_date": data.get(
+            "start_date",
+            "-",
+        ),
+
+        "end_date": data.get(
+            "end_date",
+            "-",
+        ),
+
         "premise_address": _build_address(
             data.get("rent_alamatswn"),
             data.get("rent_jalanname"),
@@ -246,6 +769,7 @@ def build_sewaan_receipt_item_from_api(data):
             data.get("rent_bandarnam"),
             data.get("rent_negeri"),
         ),
+
         "mailing_address": _build_address(
             data.get("alamat1"),
             data.get("alamat2"),
@@ -255,12 +779,36 @@ def build_sewaan_receipt_item_from_api(data):
             data.get("pekan_name"),
             data.get("ten_negeri"),
         ),
-        "outstanding_rent": data.get("tunggakan_sewa", "0"),
-        "current_rent": data.get("rental_fee", "0"),
-        "water_charge": data.get("tunggakan_caj_air", "0"),
-        "electric_charge": data.get("tunggakan_caj_elektrik", "0"),
-        "management_charge": data.get("tunggakan_caj_pengurusan", "0"),
-        "amount": data.get("jumlah", "0"),
+
+        "outstanding_rent": data.get(
+            "tunggakan_sewa",
+            "0",
+        ),
+
+        "current_rent": data.get(
+            "rental_fee",
+            data.get("sewa_semasa", "0"),
+        ),
+
+        "water_charge": data.get(
+            "tunggakan_caj_air",
+            "0",
+        ),
+
+        "electric_charge": data.get(
+            "tunggakan_caj_elektrik",
+            "0",
+        ),
+
+        "management_charge": data.get(
+            "tunggakan_caj_pengurusan",
+            "0",
+        ),
+
+        "amount": data.get(
+            "jumlah",
+            "0",
+        ),
     }
 
 
@@ -279,7 +827,12 @@ def generate_sewaan_receipt_bentong(
         sewaan_items = []
 
     buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
+
+    c = canvas.Canvas(
+        buffer,
+        pagesize=A4,
+    )
+
     width, height = A4
 
     primary_blue = colors.HexColor("#003B8E")
@@ -293,195 +846,640 @@ def generate_sewaan_receipt_bentong(
     table_right = width - 45
     table_width = table_right - table_left
 
-    footer_safe_y = 115
+    footer_safe_y = 125
     item_gap = 10
     total_gap = 24
 
-    _draw_page_header(c, width, height, primary_blue, secondary_blue, light_blue)
+    _draw_page_header(
+        c,
+        width,
+        height,
+        primary_blue,
+        secondary_blue,
+        light_blue,
+    )
 
-    y = height - 205
+    # =====================================================
+    # RECEIPT TITLE AND PAYMENT INFORMATION
+    # =====================================================
 
-    c.setFillColor(primary_blue)
-    c.setFont("Helvetica-Bold", 22)
-    c.drawString(45, y, L["receipt"])
+    y = height - 202
+
+    _draw_bilingual_left(
+        c,
+        L["receipt_ms"],
+        L["receipt_en"],
+        45,
+        y,
+        malay_size=22,
+        english_size=12,
+        malay_color=primary_blue,
+        english_color=secondary_blue,
+        line_gap=17,
+    )
 
     c.setFont("Helvetica-Bold", 10)
     c.setFillColor(secondary_blue)
-    c.drawString(45, y - 20, f"#{order_no or '-'}")
 
-    c.setFont("Helvetica", 10)
-    c.setFillColor(grey_text)
-    c.drawString(45, y - 40, f"{L['paid_at']}: {paid_date.strftime('%d %b %Y %I:%M %p')}")
-    c.drawString(45, y - 56, f"{L['payment_method']}: {_safe_text(payment_method)}")
+    c.drawString(
+        45,
+        y - 38,
+        f"#{order_no or '-'}",
+    )
 
-    next_y = y - 72
+    metadata_y = y - 62
+
+    metadata_y = _draw_bilingual_label_value(
+        c,
+        L["paid_at_ms"],
+        L["paid_at_en"],
+        paid_date.strftime(
+            "%d %b %Y %I:%M %p"
+        ),
+        45,
+        metadata_y,
+        max_width=470,
+        label_width=145,
+        malay_size=8.5,
+        english_size=7.5,
+        value_size=9,
+    )
+
+    metadata_y -= 3
+
+    metadata_y = _draw_bilingual_label_value(
+        c,
+        L["payment_method_ms"],
+        L["payment_method_en"],
+        _safe_text(payment_method),
+        45,
+        metadata_y,
+        max_width=470,
+        label_width=145,
+        malay_size=8.5,
+        english_size=7.5,
+        value_size=9,
+    )
+
     if bank_trx_no:
-        c.drawString(45, next_y, f"{L['bank_trx']}: {bank_trx_no}")
-        next_y -= 16
+        metadata_y -= 3
 
-    y -= 128
-    _draw_table_header(c, y, table_left, table_right, table_width, secondary_blue)
-    y -= 42
+        _draw_bilingual_label_value(
+            c,
+            L["bank_trx_ms"],
+            L["bank_trx_en"],
+            _safe_text(bank_trx_no),
+            45,
+            metadata_y,
+            max_width=470,
+            label_width=145,
+            malay_size=8.5,
+            english_size=7.5,
+            value_size=9,
+        )
+
+    # =====================================================
+    # TABLE HEADER
+    # =====================================================
+
+    y = height - 355
+
+    _draw_table_header(
+        c,
+        y,
+        table_left,
+        table_right,
+        table_width,
+        secondary_blue,
+    )
+
+    y -= 50
 
     total_amount = 0.0
 
-    for index, item in enumerate(sewaan_items, start=1):
-        account_number = _safe_text(item.get("account_number"))
-        old_account_number = _safe_text(item.get("old_account_number"))
-        tenant_name = _safe_text(item.get("tenant_name"))
-        registration_no = _safe_text(item.get("registration_no"))
+    # =====================================================
+    # RENTAL ITEMS
+    # =====================================================
 
-        start_date = _format_date(item.get("start_date"))
-        end_date = _format_date(item.get("end_date"))
+    for index, item in enumerate(
+        sewaan_items,
+        start=1,
+    ):
+        account_number = _safe_text(
+            item.get("account_number")
+        )
 
-        premise_address = _safe_text(item.get("premise_address"))
-        mailing_address = _safe_text(item.get("mailing_address"))
+        old_account_number = _safe_text(
+            item.get("old_account_number")
+        )
 
-        outstanding_rent = item.get("outstanding_rent", "0")
-        current_rent = item.get("current_rent", "0")
-        water_charge = item.get("water_charge", "0")
-        electric_charge = item.get("electric_charge", "0")
-        management_charge = item.get("management_charge", "0")
+        tenant_name = _safe_text(
+            item.get("tenant_name")
+        )
 
-        amount = float(item.get("amount", 0) or 0)
+        registration_no = _safe_text(
+            item.get("registration_no")
+        )
+
+        start_date = _format_date(
+            item.get("start_date")
+        )
+
+        end_date = _format_date(
+            item.get("end_date")
+        )
+
+        premise_address = _safe_text(
+            item.get("premise_address")
+        )
+
+        mailing_address = _safe_text(
+            item.get("mailing_address")
+        )
+
+        outstanding_rent = _safe_float(
+            item.get("outstanding_rent")
+        )
+
+        current_rent = _safe_float(
+            item.get("current_rent")
+        )
+
+        water_charge = _safe_float(
+            item.get("water_charge")
+        )
+
+        electric_charge = _safe_float(
+            item.get("electric_charge")
+        )
+
+        management_charge = _safe_float(
+            item.get("management_charge")
+        )
+
+        amount = _safe_float(
+            item.get("amount")
+        )
+
         total_amount += amount
 
-        premise_lines = _wrap_text_lines(c, premise_address, 295, "Helvetica", 9)
-        mailing_lines = _wrap_text_lines(c, mailing_address, 295, "Helvetica", 9)
+        premise_lines = _wrap_text_lines(
+            c,
+            premise_address,
+            255,
+            "Helvetica",
+            8.5,
+        )
 
-        row_height = 200 + (len(premise_lines) * 11) + (len(mailing_lines) * 11)
+        mailing_lines = _wrap_text_lines(
+            c,
+            mailing_address,
+            255,
+            "Helvetica",
+            8.5,
+        )
+
+        optional_charge_count = sum(
+            1
+            for charge in [
+                water_charge,
+                electric_charge,
+                management_charge,
+            ]
+            if charge > 0
+        )
+
+        old_account_extra = (
+            25
+            if old_account_number != "-"
+            else 0
+        )
+
+        row_height = (
+            255
+            + old_account_extra
+            + (len(premise_lines) * 11)
+            + (len(mailing_lines) * 11)
+            + (optional_charge_count * 25)
+        )
 
         if y - row_height < footer_safe_y:
-            _draw_footer(c, width, primary_blue, grey_text)
+            _draw_footer(
+                c,
+                width,
+                primary_blue,
+                grey_text,
+            )
+
             c.showPage()
 
-            _draw_page_header(c, width, height, primary_blue, secondary_blue, light_blue)
-            y = height - 195
-            _draw_table_header(c, y, table_left, table_right, table_width, secondary_blue)
-            y -= 42
+            _draw_page_header(
+                c,
+                width,
+                height,
+                primary_blue,
+                secondary_blue,
+                light_blue,
+            )
 
-        c.setFillColor(soft_blue if index % 2 == 0 else colors.white)
-        c.roundRect(table_left, y - row_height, table_width, row_height, 9, fill=True, stroke=False)
+            y = height - 220
 
-        c.setStrokeColor(colors.HexColor("#D9E8FF"))
-        c.roundRect(table_left, y - row_height, table_width, row_height, 9, fill=False, stroke=True)
+            _draw_table_header(
+                c,
+                y,
+                table_left,
+                table_right,
+                table_width,
+                secondary_blue,
+            )
+
+            y -= 50
+
+        c.setFillColor(
+            soft_blue
+            if index % 2 == 0
+            else colors.white
+        )
+
+        c.roundRect(
+            table_left,
+            y - row_height,
+            table_width,
+            row_height,
+            9,
+            fill=True,
+            stroke=False,
+        )
+
+        c.setStrokeColor(
+            colors.HexColor("#D9E8FF")
+        )
+
+        c.roundRect(
+            table_left,
+            y - row_height,
+            table_width,
+            row_height,
+            9,
+            fill=False,
+            stroke=True,
+        )
 
         c.setFillColor(dark_text)
         c.setFont("Helvetica-Bold", 10)
-        c.drawString(table_left + 18, y - 22, str(index))
 
-        c.setFillColor(primary_blue)
-        c.setFont("Helvetica-Bold", 11)
-        c.drawString(table_left + 55, y - 22, L["row_title"])
+        c.drawString(
+            table_left + 18,
+            y - 23,
+            str(index),
+        )
+
+        _draw_bilingual_left(
+            c,
+            L["row_title_ms"],
+            L["row_title_en"],
+            table_left + 55,
+            y - 20,
+            malay_size=11,
+            english_size=8.5,
+            malay_color=primary_blue,
+            english_color=grey_text,
+            line_gap=12,
+        )
 
         c.setFillColor(primary_blue)
         c.setFont("Helvetica-Bold", 10)
-        c.drawRightString(table_right - 18, y - 22, f"RM {_format_money(amount)}")
 
-        info_y = y - 44
+        c.drawRightString(
+            table_right - 18,
+            y - 22,
+            f"RM {_format_money(amount)}",
+        )
 
-        c.setFillColor(dark_text)
-        c.setFont("Helvetica", 9)
-        c.drawString(table_left + 55, info_y, f"{L['account_number']}: {account_number}")
+        info_y = y - 54
+        content_width = 330
 
-        info_y -= 14
+        info_y = _draw_bilingual_label_value(
+            c,
+            L["account_number_ms"],
+            L["account_number_en"],
+            account_number,
+            table_left + 55,
+            info_y,
+            max_width=content_width,
+            label_width=125,
+            malay_size=8,
+            english_size=7,
+            value_size=8.5,
+        )
+
         if old_account_number != "-":
-            c.drawString(table_left + 55, info_y, f"{L['old_account_number']}: {old_account_number}")
-            info_y -= 14
+            info_y -= 3
 
-        c.drawString(table_left + 55, info_y, f"{L['tenant_name']}: {tenant_name}")
-        info_y -= 14
+            info_y = _draw_bilingual_label_value(
+                c,
+                L["old_account_number_ms"],
+                L["old_account_number_en"],
+                old_account_number,
+                table_left + 55,
+                info_y,
+                max_width=content_width,
+                label_width=125,
+                malay_size=8,
+                english_size=7,
+                value_size=8.5,
+            )
 
-        c.drawString(table_left + 55, info_y, f"{L['registration_no']}: {registration_no}")
-        info_y -= 14
+        info_y -= 3
 
-        c.drawString(table_left + 55, info_y, f"{L['rental_period']}: {start_date} - {end_date}")
-        info_y -= 18
+        info_y = _draw_bilingual_label_value(
+            c,
+            L["tenant_name_ms"],
+            L["tenant_name_en"],
+            tenant_name,
+            table_left + 55,
+            info_y,
+            max_width=content_width,
+            label_width=125,
+            malay_size=8,
+            english_size=7,
+            value_size=8.5,
+        )
 
+        info_y -= 3
+
+        info_y = _draw_bilingual_label_value(
+            c,
+            L["registration_no_ms"],
+            L["registration_no_en"],
+            registration_no,
+            table_left + 55,
+            info_y,
+            max_width=content_width,
+            label_width=125,
+            malay_size=8,
+            english_size=7,
+            value_size=8.5,
+        )
+
+        info_y -= 3
+
+        info_y = _draw_bilingual_label_value(
+            c,
+            L["rental_period_ms"],
+            L["rental_period_en"],
+            f"{start_date} - {end_date}",
+            table_left + 55,
+            info_y,
+            max_width=content_width,
+            label_width=125,
+            malay_size=8,
+            english_size=7,
+            value_size=8.5,
+        )
+
+        info_y -= 4
+
+        # Premise address
         c.setFillColor(primary_blue)
-        c.setFont("Helvetica-Bold", 9)
-        c.drawString(table_left + 55, info_y, f"{L['premise_address']}:")
-        info_y -= 13
+        c.setFont("Helvetica-Bold", 8)
 
-        c.setFillColor(colors.HexColor("#333333"))
-        c.setFont("Helvetica", 9)
+        c.drawString(
+            table_left + 55,
+            info_y,
+            L["premise_address_ms"],
+        )
+
+        c.setFillColor(grey_text)
+        c.setFont("Helvetica-Oblique", 7)
+
+        c.drawString(
+            table_left + 55,
+            info_y - 10,
+            L["premise_address_en"],
+        )
+
+        info_y -= 24
+
+        c.setFillColor(
+            colors.HexColor("#333333")
+        )
+
+        c.setFont("Helvetica", 8.5)
+
         for line in premise_lines:
-            c.drawString(table_left + 55, info_y, line)
+            c.drawString(
+                table_left + 55,
+                info_y,
+                line,
+            )
+
             info_y -= 11
 
         info_y -= 5
 
+        # Mailing address
         c.setFillColor(primary_blue)
-        c.setFont("Helvetica-Bold", 9)
-        c.drawString(table_left + 55, info_y, f"{L['mailing_address']}:")
-        info_y -= 13
+        c.setFont("Helvetica-Bold", 8)
 
-        c.setFillColor(colors.HexColor("#333333"))
-        c.setFont("Helvetica", 9)
+        c.drawString(
+            table_left + 55,
+            info_y,
+            L["mailing_address_ms"],
+        )
+
+        c.setFillColor(grey_text)
+        c.setFont("Helvetica-Oblique", 7)
+
+        c.drawString(
+            table_left + 55,
+            info_y - 10,
+            L["mailing_address_en"],
+        )
+
+        info_y -= 24
+
+        c.setFillColor(
+            colors.HexColor("#333333")
+        )
+
+        c.setFont("Helvetica", 8.5)
+
         for line in mailing_lines:
-            c.drawString(table_left + 55, info_y, line)
+            c.drawString(
+                table_left + 55,
+                info_y,
+                line,
+            )
+
             info_y -= 11
 
         info_y -= 8
 
-        c.setFillColor(dark_text)
-        c.setFont("Helvetica", 9)
-        c.drawString(table_left + 55, info_y, f"{L['outstanding_rent']}: RM {_format_money(outstanding_rent)}")
-        info_y -= 14
+        # Charges
+        charge_rows = [
+            (
+                L["outstanding_rent_ms"],
+                L["outstanding_rent_en"],
+                outstanding_rent,
+                True,
+            ),
+            (
+                L["current_rent_ms"],
+                L["current_rent_en"],
+                current_rent,
+                True,
+            ),
+            (
+                L["water_charge_ms"],
+                L["water_charge_en"],
+                water_charge,
+                water_charge > 0,
+            ),
+            (
+                L["electric_charge_ms"],
+                L["electric_charge_en"],
+                electric_charge,
+                electric_charge > 0,
+            ),
+            (
+                L["management_charge_ms"],
+                L["management_charge_en"],
+                management_charge,
+                management_charge > 0,
+            ),
+        ]
 
-        c.drawString(table_left + 55, info_y, f"{L['current_rent']}: RM {_format_money(current_rent)}")
-        info_y -= 14
+        for (
+            malay_label,
+            english_label,
+            charge_value,
+            should_show,
+        ) in charge_rows:
+            if not should_show:
+                continue
 
-        if float(water_charge or 0) > 0:
-            c.drawString(table_left + 55, info_y, f"{L['water_charge']}: RM {_format_money(water_charge)}")
-            info_y -= 14
+            info_y = _draw_bilingual_label_value(
+                c,
+                malay_label,
+                english_label,
+                f"RM {_format_money(charge_value)}",
+                table_left + 55,
+                info_y,
+                max_width=content_width,
+                label_width=125,
+                malay_size=8,
+                english_size=7,
+                value_size=8.5,
+            )
 
-        if float(electric_charge or 0) > 0:
-            c.drawString(table_left + 55, info_y, f"{L['electric_charge']}: RM {_format_money(electric_charge)}")
-            info_y -= 14
-
-        if float(management_charge or 0) > 0:
-            c.drawString(table_left + 55, info_y, f"{L['management_charge']}: RM {_format_money(management_charge)}")
-            info_y -= 14
+            info_y -= 3
 
         y -= row_height + item_gap
 
+    # =====================================================
+    # TOTAL BAR
+    # =====================================================
+
     y -= total_gap
 
-    total_bar_height = 42
-    reminder_space = 45
+    total_bar_height = 50
+    reminder_space = 75
 
-    if y - total_bar_height - reminder_space < footer_safe_y:
-        _draw_footer(c, width, primary_blue, grey_text)
+    if (
+        y
+        - total_bar_height
+        - reminder_space
+        < footer_safe_y
+    ):
+        _draw_footer(
+            c,
+            width,
+            primary_blue,
+            grey_text,
+        )
+
         c.showPage()
 
-        _draw_page_header(c, width, height, primary_blue, secondary_blue, light_blue)
-        y = height - 205
+        _draw_page_header(
+            c,
+            width,
+            height,
+            primary_blue,
+            secondary_blue,
+            light_blue,
+        )
+
+        y = height - 220
 
     c.setFillColor(primary_blue)
-    c.roundRect(table_left, y - total_bar_height, table_width, total_bar_height, 12, fill=True, stroke=False)
+
+    c.roundRect(
+        table_left,
+        y - total_bar_height,
+        table_width,
+        total_bar_height,
+        12,
+        fill=True,
+        stroke=False,
+    )
+
+    _draw_bilingual_left(
+        c,
+        L["total_paid_ms"],
+        L["total_paid_en"],
+        table_left + 18,
+        y - 20,
+        malay_size=12,
+        english_size=8,
+        malay_color=colors.white,
+        english_color=colors.white,
+        line_gap=12,
+    )
 
     c.setFillColor(colors.white)
     c.setFont("Helvetica-Bold", 13)
-    c.drawString(table_left + 18, y - 27, L["total_paid"])
 
-    c.drawRightString(table_right - 18, y - 27, f"RM {_format_money(total_amount)}")
+    c.drawRightString(
+        table_right - 18,
+        y - 29,
+        f"RM {_format_money(total_amount)}",
+    )
 
-    y -= total_bar_height + 36
+    y -= total_bar_height + 30
 
-    c.setFillColor(grey_text)
-    c.setFont("Helvetica", 7)
-    reminder_lines = _wrap_text_lines(c, L["reminder"], table_width - 40, "Helvetica", 7)
-    for line in reminder_lines:
-        c.drawCentredString(width / 2, y, line)
-        y -= 10
+    # =====================================================
+    # REMINDER
+    # =====================================================
 
-    _draw_footer(c, width, primary_blue, grey_text)
+    _draw_bilingual_wrapped_center(
+        c,
+        L["reminder_ms"],
+        L["reminder_en"],
+        width / 2,
+        y,
+        table_width - 40,
+        malay_size=7,
+        english_size=7,
+        line_height=9,
+    )
+
+    # =====================================================
+    # FOOTER
+    # =====================================================
+
+    _draw_footer(
+        c,
+        width,
+        primary_blue,
+        grey_text,
+    )
 
     c.showPage()
     c.save()
 
     buffer.seek(0)
+
     return buffer.read()
 
 
@@ -555,8 +1553,12 @@ if __name__ == "__main__":
     }
 
     sewaan_items = [
-        build_sewaan_receipt_item_from_api(api_data_1),
-        build_sewaan_receipt_item_from_api(api_data_2),
+        build_sewaan_receipt_item_from_api(
+            api_data_1
+        ),
+        build_sewaan_receipt_item_from_api(
+            api_data_2
+        ),
     ]
 
     pdf_bytes = generate_sewaan_receipt_bentong(
@@ -567,7 +1569,13 @@ if __name__ == "__main__":
         sewaan_items=sewaan_items,
     )
 
-    with open("sewaan_receipt_bentong.pdf", "wb") as f:
-        f.write(pdf_bytes)
+    with open(
+        "sewaan_receipt_bentong.pdf",
+        "wb",
+    ) as output_file:
+        output_file.write(pdf_bytes)
 
-    print("PDF generated: sewaan_receipt_bentong.pdf")
+    print(
+        "PDF generated: "
+        "sewaan_receipt_bentong.pdf"
+    )

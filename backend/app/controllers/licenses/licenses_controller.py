@@ -1,736 +1,1732 @@
+from datetime import date, timedelta
+from io import BytesIO
+import html
+
+import qrcode
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
-from sqlalchemy.orm import Session
 from fpdf import FPDF
-from io import BytesIO
-from datetime import date, timedelta
-import qrcode
+from sqlalchemy.orm import Session
 
+from app.controllers.licenses.licenses_receipt import generate_multi_license_pdf
 from app.db.database import get_db
-from app.utils.blob_upload import upload_to_blob
-from app.utils.config import BASE_URL
-from app.models.licenses.licenses_model  import (
-    LicenseCreate, LicenseResponse,
-    OwnerLicenseCreate, OwnerLicenseResponse
+from app.models.licenses.licenses_model import (
+    LicenseCreate,
+    LicenseResponse,
+    OwnerLicenseCreate,
+    OwnerLicenseResponse,
 )
 from app.schema.licenses.licenses_schema import License, OwnerLicense
-from app.controllers.licenses.licenses_receipt import generate_multi_license_pdf
+from app.utils.blob_upload import upload_to_blob
 
-router = APIRouter(prefix="/license", tags=["License"])
 
-# ----------------- OWNER ENDPOINTS -----------------
+router = APIRouter(
+    prefix="/license",
+    tags=["License"],
+)
 
-@router.post("/owner", response_model=OwnerLicenseResponse)
-def create_owner(owner: OwnerLicenseCreate, db: Session = Depends(get_db)):
-    # Check if owner already exists
-    existing = db.query(OwnerLicense).filter(OwnerLicense.ic == owner.ic).first()
+
+# =========================================================
+# HELPERS
+# =========================================================
+
+def _safe_html(value, fallback="-"):
+    if value is None:
+        return fallback
+
+    text = str(value).strip()
+
+    if not text:
+        return fallback
+
+    return html.escape(text)
+
+
+def _safe_amount(value):
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _format_date(value):
+    if not value:
+        return "-"
+
+    try:
+        return value.strftime("%d/%m/%Y")
+    except (AttributeError, ValueError):
+        return _safe_html(value)
+
+
+def _generate_qr_response(url):
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+
+    qr.add_data(url)
+    qr.make(fit=True)
+
+    image = qr.make_image(
+        fill_color="black",
+        back_color="white",
+    )
+
+    buffer = BytesIO()
+    image.save(buffer, "PNG")
+    buffer.seek(0)
+
+    return StreamingResponse(
+        buffer,
+        media_type="image/png",
+    )
+
+
+def _build_single_license_html(
+    license_obj,
+    owner_name,
+    pdf_url,
+):
+    return f"""
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <meta name="color-scheme" content="only light">
+
+    <title>
+        E-Resit Lesen /
+        License E-Receipt
+    </title>
+
+    <style>
+        * {{
+            box-sizing: border-box;
+        }}
+
+        html {{
+            color-scheme: only light;
+            background: #eef3f8;
+        }}
+
+        body {{
+            margin: 0;
+            padding: 28px 16px;
+            min-height: 100vh;
+            background:
+                linear-gradient(
+                    180deg,
+                    #eaf2ff 0%,
+                    #f7f9fc 100%
+                );
+            color: #111827;
+            font-family:
+                "Segoe UI",
+                Arial,
+                sans-serif;
+        }}
+
+        .page {{
+            width: 100%;
+            max-width: 860px;
+            margin: 0 auto;
+        }}
+
+        .receipt {{
+            background: #ffffff;
+            border: 1px solid #dfe7f2;
+            border-radius: 22px;
+            overflow: hidden;
+            box-shadow:
+                0 18px 45px
+                rgba(15, 23, 42, 0.12);
+        }}
+
+        .header {{
+            position: relative;
+            overflow: hidden;
+            padding: 34px 30px;
+            text-align: center;
+            color: #ffffff;
+            background:
+                linear-gradient(
+                    135deg,
+                    #003b8e,
+                    #0a66d8
+                );
+        }}
+
+        .header::after {{
+            content: "";
+            position: absolute;
+            width: 220px;
+            height: 220px;
+            right: -70px;
+            top: -90px;
+            border-radius: 50%;
+            background:
+                rgba(255, 255, 255, 0.08);
+        }}
+
+        .header-content {{
+            position: relative;
+            z-index: 1;
+        }}
+
+        .ms {{
+            font-weight: 700;
+        }}
+
+        .en {{
+            margin-top: 3px;
+            font-style: italic;
+            font-weight: 400;
+            color: #6b7280;
+            font-size: 0.88em;
+        }}
+
+        .header .ms {{
+            color: #ffffff;
+        }}
+
+        .header .en {{
+            color:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    0.86
+                );
+        }}
+
+        .title .ms {{
+            font-size: 30px;
+            line-height: 1.1;
+        }}
+
+        .title .en {{
+            margin-top: 7px;
+            font-size: 17px;
+        }}
+
+        .subtitle {{
+            margin-top: 15px;
+        }}
+
+        .subtitle .ms {{
+            font-size: 14px;
+        }}
+
+        .subtitle .en {{
+            font-size: 12px;
+        }}
+
+        .content {{
+            padding: 30px;
+        }}
+
+        .summary-grid {{
+            display: grid;
+            grid-template-columns:
+                repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }}
+
+        .summary-card {{
+            padding: 16px;
+            border: 1px solid #dce8f8;
+            border-radius: 14px;
+            background: #f8fbff;
+        }}
+
+        .summary-card.full {{
+            grid-column: 1 / -1;
+        }}
+
+        .label {{
+            margin-bottom: 8px;
+        }}
+
+        .label .ms {{
+            color: #0f3f83;
+            font-size: 14px;
+        }}
+
+        .label .en {{
+            font-size: 12px;
+        }}
+
+        .value {{
+            color: #111827;
+            font-size: 16px;
+            font-weight: 600;
+            line-height: 1.45;
+            word-break: break-word;
+        }}
+
+        .amount-card {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            margin-top: 22px;
+            padding: 20px 22px;
+            border: 1px solid #bfd7ff;
+            border-left: 6px solid #0a66d8;
+            border-radius: 16px;
+            background:
+                linear-gradient(
+                    135deg,
+                    #eaf3ff,
+                    #f5f9ff
+                );
+        }}
+
+        .amount-label .ms {{
+            color: #0f3f83;
+            font-size: 17px;
+        }}
+
+        .amount-label .en {{
+            font-size: 13px;
+        }}
+
+        .amount-value {{
+            color: #0a56c2;
+            font-size: 30px;
+            font-weight: 800;
+            white-space: nowrap;
+        }}
+
+        .thank-you {{
+            margin-top: 28px;
+            text-align: center;
+            color: #15803d;
+        }}
+
+        .thank-you .ms {{
+            font-size: 19px;
+        }}
+
+        .thank-you .en {{
+            color: #2f855a;
+            font-size: 14px;
+        }}
+
+        .pdf-button {{
+            margin-top: 28px;
+            text-align: center;
+        }}
+
+        .pdf-button a {{
+            display: inline-block;
+            min-width: 260px;
+            padding: 14px 24px;
+            border-radius: 12px;
+            background:
+                linear-gradient(
+                    135deg,
+                    #16a34a,
+                    #22c55e
+                );
+            color: #ffffff;
+            text-decoration: none;
+            box-shadow:
+                0 8px 18px
+                rgba(34, 197, 94, 0.25);
+        }}
+
+        .pdf-button .ms,
+        .pdf-button .en {{
+            color: #ffffff;
+        }}
+
+        .footer {{
+            margin-top: 30px;
+            padding-top: 22px;
+            border-top: 1px solid #e5e7eb;
+            text-align: center;
+            color: #6b7280;
+            font-size: 13px;
+            line-height: 1.5;
+        }}
+
+        .footer .ms {{
+            color: #374151;
+        }}
+
+        @media (max-width: 680px) {{
+            body {{
+                padding: 12px;
+            }}
+
+            .header {{
+                padding: 28px 18px;
+            }}
+
+            .title .ms {{
+                font-size: 24px;
+            }}
+
+            .title .en {{
+                font-size: 15px;
+            }}
+
+            .content {{
+                padding: 20px 16px;
+            }}
+
+            .summary-grid {{
+                grid-template-columns: 1fr;
+            }}
+
+            .summary-card.full {{
+                grid-column: auto;
+            }}
+
+            .amount-card {{
+                display: block;
+                text-align: center;
+            }}
+
+            .amount-value {{
+                margin-top: 10px;
+                font-size: 27px;
+            }}
+
+            .pdf-button a {{
+                width: 100%;
+                min-width: 0;
+            }}
+        }}
+
+        @media print {{
+            body {{
+                padding: 0;
+                background: #ffffff;
+            }}
+
+            .receipt {{
+                border: none;
+                border-radius: 0;
+                box-shadow: none;
+            }}
+
+            .pdf-button {{
+                display: none;
+            }}
+        }}
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <div class="receipt">
+            <div class="header">
+                <div class="header-content">
+                    <div class="title">
+                        <div class="ms">
+                            E-Resit Lesen
+                        </div>
+
+                        <div class="en">
+                            License E-Receipt
+                        </div>
+                    </div>
+
+                    <div class="subtitle">
+                        <div class="ms">
+                            Rekod Transaksi Rasmi
+                        </div>
+
+                        <div class="en">
+                            Official Transaction Record
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content">
+                <div class="summary-grid">
+                    <div class="summary-card">
+                        <div class="label">
+                            <div class="ms">
+                                No. Lesen
+                            </div>
+
+                            <div class="en">
+                                License No.
+                            </div>
+                        </div>
+
+                        <div class="value">
+                            {_safe_html(license_obj.licensenum)}
+                        </div>
+                    </div>
+
+                    <div class="summary-card">
+                        <div class="label">
+                            <div class="ms">
+                                Jenis Lesen
+                            </div>
+
+                            <div class="en">
+                                License Type
+                            </div>
+                        </div>
+
+                        <div class="value">
+                            {_safe_html(license_obj.licensetype)}
+                        </div>
+                    </div>
+
+                    <div class="summary-card">
+                        <div class="label">
+                            <div class="ms">
+                                No. IC Pemilik
+                            </div>
+
+                            <div class="en">
+                                Owner IC
+                            </div>
+                        </div>
+
+                        <div class="value">
+                            {_safe_html(license_obj.ic)}
+                        </div>
+                    </div>
+
+                    <div class="summary-card">
+                        <div class="label">
+                            <div class="ms">
+                                Nama Pemilik
+                            </div>
+
+                            <div class="en">
+                                Owner Name
+                            </div>
+                        </div>
+
+                        <div class="value">
+                            {_safe_html(owner_name)}
+                        </div>
+                    </div>
+
+                    <div class="summary-card">
+                        <div class="label">
+                            <div class="ms">
+                                Tarikh Mula
+                            </div>
+
+                            <div class="en">
+                                Start Date
+                            </div>
+                        </div>
+
+                        <div class="value">
+                            {_format_date(license_obj.start_date)}
+                        </div>
+                    </div>
+
+                    <div class="summary-card">
+                        <div class="label">
+                            <div class="ms">
+                                Tarikh Tamat
+                            </div>
+
+                            <div class="en">
+                                End Date
+                            </div>
+                        </div>
+
+                        <div class="value">
+                            {_format_date(license_obj.end_date)}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="amount-card">
+                    <div class="amount-label">
+                        <div class="ms">
+                            Jumlah Dibayar
+                        </div>
+
+                        <div class="en">
+                            Total Paid
+                        </div>
+                    </div>
+
+                    <div class="amount-value">
+                        RM {_safe_amount(license_obj.amount):,.2f}
+                    </div>
+                </div>
+
+                <div class="thank-you">
+                    <div class="ms">
+                        Terima kasih atas pembayaran anda.
+                    </div>
+
+                    <div class="en">
+                        Thank you for your payment.
+                    </div>
+                </div>
+
+                <div class="pdf-button">
+                    <a
+                        href="{pdf_url}"
+                        target="_blank"
+                    >
+                        <div class="ms">
+                            Muat Turun Resit PDF
+                        </div>
+
+                        <div class="en">
+                            Download PDF Receipt
+                        </div>
+                    </a>
+                </div>
+
+                <div class="footer">
+                    <div class="ms">
+                        © 2026 Juara Inovasi Pintar System
+                        · Hak Cipta Terpelihara
+                    </div>
+
+                    <div class="en">
+                        All Rights Reserved
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+
+def _build_multi_license_html(
+    licenses_data,
+    total_amount,
+    pdf_url,
+):
+    rows_html = ""
+
+    for license_item in licenses_data:
+        rows_html += f"""
+        <tr>
+            <td>
+                {_safe_html(license_item.get("licensenumber"))}
+            </td>
+
+            <td>
+                {_safe_html(license_item.get("licensetype"))}
+            </td>
+
+            <td>
+                {_format_date(license_item.get("expired_date"))}
+            </td>
+
+            <td class="money">
+                RM {_safe_amount(license_item.get("amount")):,.2f}
+            </td>
+        </tr>
+        """
+
+    return f"""
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <meta name="color-scheme" content="only light">
+
+    <title>
+        Resit Pelbagai Lesen /
+        Multiple License Receipt
+    </title>
+
+    <style>
+        * {{
+            box-sizing: border-box;
+        }}
+
+        html {{
+            color-scheme: only light;
+            background: #eef3f8;
+        }}
+
+        body {{
+            margin: 0;
+            padding: 28px 16px;
+            min-height: 100vh;
+            background:
+                linear-gradient(
+                    180deg,
+                    #eaf2ff 0%,
+                    #f7f9fc 100%
+                );
+            color: #111827;
+            font-family:
+                "Segoe UI",
+                Arial,
+                sans-serif;
+        }}
+
+        .page {{
+            width: 100%;
+            max-width: 980px;
+            margin: 0 auto;
+        }}
+
+        .receipt {{
+            background: #ffffff;
+            border: 1px solid #dfe7f2;
+            border-radius: 22px;
+            overflow: hidden;
+            box-shadow:
+                0 18px 45px
+                rgba(15, 23, 42, 0.12);
+        }}
+
+        .header {{
+            position: relative;
+            overflow: hidden;
+            padding: 34px 30px;
+            text-align: center;
+            color: #ffffff;
+            background:
+                linear-gradient(
+                    135deg,
+                    #003b8e,
+                    #0a66d8
+                );
+        }}
+
+        .header::after {{
+            content: "";
+            position: absolute;
+            width: 220px;
+            height: 220px;
+            right: -70px;
+            top: -90px;
+            border-radius: 50%;
+            background:
+                rgba(255, 255, 255, 0.08);
+        }}
+
+        .header-content {{
+            position: relative;
+            z-index: 1;
+        }}
+
+        .ms {{
+            font-weight: 700;
+        }}
+
+        .en {{
+            margin-top: 3px;
+            font-style: italic;
+            font-weight: 400;
+            color: #6b7280;
+            font-size: 0.88em;
+        }}
+
+        .header .ms {{
+            color: #ffffff;
+        }}
+
+        .header .en {{
+            color:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    0.86
+                );
+        }}
+
+        .title .ms {{
+            font-size: 30px;
+            line-height: 1.1;
+        }}
+
+        .title .en {{
+            margin-top: 7px;
+            font-size: 17px;
+        }}
+
+        .subtitle {{
+            margin-top: 15px;
+        }}
+
+        .content {{
+            padding: 30px;
+        }}
+
+        .table-container {{
+            width: 100%;
+            overflow-x: auto;
+            border: 1px solid #dce8f8;
+            border-radius: 14px;
+        }}
+
+        table {{
+            width: 100%;
+            min-width: 760px;
+            border-collapse: collapse;
+        }}
+
+        th {{
+            padding: 14px 13px;
+            text-align: left;
+            vertical-align: middle;
+            color: #ffffff;
+            background: #0a66d8;
+        }}
+
+        th .ms {{
+            color: #ffffff;
+        }}
+
+        th .en {{
+            color:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    0.85
+                );
+            font-size: 11px;
+        }}
+
+        td {{
+            padding: 14px 13px;
+            border-bottom: 1px solid #e5e7eb;
+            vertical-align: top;
+            font-size: 14px;
+        }}
+
+        tbody tr:nth-child(even) {{
+            background: #f8fbff;
+        }}
+
+        tbody tr:last-child td {{
+            border-bottom: none;
+        }}
+
+        .money {{
+            text-align: right;
+            white-space: nowrap;
+            color: #0a56c2;
+            font-weight: 700;
+        }}
+
+        .total-card {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            margin-top: 22px;
+            padding: 20px 22px;
+            border: 1px solid #bfd7ff;
+            border-left: 6px solid #0a66d8;
+            border-radius: 16px;
+            background:
+                linear-gradient(
+                    135deg,
+                    #eaf3ff,
+                    #f5f9ff
+                );
+        }}
+
+        .total-label .ms {{
+            color: #0f3f83;
+            font-size: 17px;
+        }}
+
+        .total-label .en {{
+            font-size: 13px;
+        }}
+
+        .total-value {{
+            color: #0a56c2;
+            font-size: 30px;
+            font-weight: 800;
+            white-space: nowrap;
+        }}
+
+        .thank-you {{
+            margin-top: 28px;
+            text-align: center;
+            color: #15803d;
+        }}
+
+        .thank-you .ms {{
+            font-size: 19px;
+        }}
+
+        .thank-you .en {{
+            color: #2f855a;
+            font-size: 14px;
+        }}
+
+        .pdf-button {{
+            margin-top: 28px;
+            text-align: center;
+        }}
+
+        .pdf-button a {{
+            display: inline-block;
+            min-width: 260px;
+            padding: 14px 24px;
+            border-radius: 12px;
+            background:
+                linear-gradient(
+                    135deg,
+                    #16a34a,
+                    #22c55e
+                );
+            color: #ffffff;
+            text-decoration: none;
+            box-shadow:
+                0 8px 18px
+                rgba(34, 197, 94, 0.25);
+        }}
+
+        .pdf-button .ms,
+        .pdf-button .en {{
+            color: #ffffff;
+        }}
+
+        .footer {{
+            margin-top: 30px;
+            padding-top: 22px;
+            border-top: 1px solid #e5e7eb;
+            text-align: center;
+            color: #6b7280;
+            font-size: 13px;
+            line-height: 1.5;
+        }}
+
+        .footer .ms {{
+            color: #374151;
+        }}
+
+        @media (max-width: 680px) {{
+            body {{
+                padding: 12px;
+            }}
+
+            .header {{
+                padding: 28px 18px;
+            }}
+
+            .title .ms {{
+                font-size: 24px;
+            }}
+
+            .title .en {{
+                font-size: 15px;
+            }}
+
+            .content {{
+                padding: 20px 16px;
+            }}
+
+            .total-card {{
+                display: block;
+                text-align: center;
+            }}
+
+            .total-value {{
+                margin-top: 10px;
+                font-size: 27px;
+            }}
+
+            .pdf-button a {{
+                width: 100%;
+                min-width: 0;
+            }}
+        }}
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <div class="receipt">
+            <div class="header">
+                <div class="header-content">
+                    <div class="title">
+                        <div class="ms">
+                            Resit Pelbagai Lesen
+                        </div>
+
+                        <div class="en">
+                            Multiple License Receipt
+                        </div>
+                    </div>
+
+                    <div class="subtitle">
+                        <div class="ms">
+                            Rekod Transaksi Rasmi
+                        </div>
+
+                        <div class="en">
+                            Official Transaction Record
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>
+                                    <div class="ms">
+                                        No. Lesen
+                                    </div>
+
+                                    <div class="en">
+                                        License Number
+                                    </div>
+                                </th>
+
+                                <th>
+                                    <div class="ms">
+                                        Jenis Lesen
+                                    </div>
+
+                                    <div class="en">
+                                        License Type
+                                    </div>
+                                </th>
+
+                                <th>
+                                    <div class="ms">
+                                        Tarikh Luput
+                                    </div>
+
+                                    <div class="en">
+                                        Expiry Date
+                                    </div>
+                                </th>
+
+                                <th style="text-align: right;">
+                                    <div class="ms">
+                                        Jumlah (RM)
+                                    </div>
+
+                                    <div class="en">
+                                        Amount (RM)
+                                    </div>
+                                </th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {rows_html}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="total-card">
+                    <div class="total-label">
+                        <div class="ms">
+                            Jumlah Keseluruhan
+                        </div>
+
+                        <div class="en">
+                            Total Amount
+                        </div>
+                    </div>
+
+                    <div class="total-value">
+                        RM {_safe_amount(total_amount):,.2f}
+                    </div>
+                </div>
+
+                <div class="thank-you">
+                    <div class="ms">
+                        Terima kasih atas pembayaran anda.
+                    </div>
+
+                    <div class="en">
+                        Thank you for your payment.
+                    </div>
+                </div>
+
+                <div class="pdf-button">
+                    <a
+                        href="{pdf_url}"
+                        target="_blank"
+                    >
+                        <div class="ms">
+                            Muat Turun Resit PDF
+                        </div>
+
+                        <div class="en">
+                            Download PDF Receipt
+                        </div>
+                    </a>
+                </div>
+
+                <div class="footer">
+                    <div class="ms">
+                        © 2026 Juara Inovasi Pintar System
+                        · Hak Cipta Terpelihara
+                    </div>
+
+                    <div class="en">
+                        All Rights Reserved
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+
+# =========================================================
+# OWNER ENDPOINTS
+# =========================================================
+
+@router.post(
+    "/owner",
+    response_model=OwnerLicenseResponse,
+)
+def create_owner(
+    owner: OwnerLicenseCreate,
+    db: Session = Depends(get_db),
+):
+    existing = (
+        db.query(OwnerLicense)
+        .filter(OwnerLicense.ic == owner.ic)
+        .first()
+    )
+
     if existing:
-        raise HTTPException(status_code=400, detail="Pemilik dengan nombor IC ini telah wujud / Owner with this IC already exists")
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Pemilik dengan nombor IC ini telah wujud / "
+                "Owner with this IC already exists"
+            ),
+        )
 
     new_owner = OwnerLicense(
         ic=owner.ic,
         name=owner.name,
         email=owner.email,
-        address=owner.address
+        address=owner.address,
     )
+
     db.add(new_owner)
     db.commit()
     db.refresh(new_owner)
+
     return new_owner
 
-# ----------------- LICENSE ENDPOINTS -----------------
 
-# Create a new license
-@router.post("/", response_model=LicenseResponse)
-def create_license(license: LicenseCreate, db: Session = Depends(get_db)):
-    # Ensure owner exists
-    owner = db.query(OwnerLicense).filter(OwnerLicense.ic == license.ic).first()
+# =========================================================
+# CREATE LICENSE
+# =========================================================
+
+@router.post(
+    "/",
+    response_model=LicenseResponse,
+)
+def create_license(
+    license: LicenseCreate,
+    db: Session = Depends(get_db),
+):
+    owner = (
+        db.query(OwnerLicense)
+        .filter(OwnerLicense.ic == license.ic)
+        .first()
+    )
+
     if not owner:
-        raise HTTPException(status_code=404, detail="Pemilik tidak dijumpai / Owner not found")
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Pemilik tidak dijumpai / "
+                "Owner not found"
+            ),
+        )
 
-    # Auto-detect license type
     if "BIZ" in license.licensenum:
-        licensetype = "Lesen Perniagaan / Business License"
-    elif "HBR" in license.licensenum:
-        licensetype = "Lesen Hiburan / Penghibur Jalanan / Entertainment / Buskers License"
-    elif "IKL" in license.licensenum:
-        licensetype = "Lesen Iklan / Advertisement License"
-    elif "KOM" in license.licensenum:
-        licensetype = "Lesen Komposit / Composite License"
-    else:
-        licensetype = "Tidak Diketahui / Unknown"
+        license_type = (
+            "Lesen Perniagaan / "
+            "Business License"
+        )
 
-    # Start date today, end date +1 year
+    elif "HBR" in license.licensenum:
+        license_type = (
+            "Lesen Hiburan / Penghibur Jalanan / "
+            "Entertainment / Buskers License"
+        )
+
+    elif "IKL" in license.licensenum:
+        license_type = (
+            "Lesen Iklan / "
+            "Advertisement License"
+        )
+
+    elif "KOM" in license.licensenum:
+        license_type = (
+            "Lesen Komposit / "
+            "Composite License"
+        )
+
+    else:
+        license_type = (
+            "Tidak Diketahui / "
+            "Unknown"
+        )
+
     today = date.today()
     end_date = today + timedelta(days=365)
 
     new_license = License(
         licensenum=license.licensenum,
-        licensetype=licensetype,
+        licensetype=license_type,
         ic=license.ic,
         amount=license.amount,
         start_date=today,
-        end_date=end_date
+        end_date=end_date,
     )
 
     db.add(new_license)
     db.commit()
     db.refresh(new_license)
+
     return new_license
 
 
-# Pay license
-@router.post("/pay/{licensenum}", response_model=LicenseResponse)
-def pay_license(licensenum: str, db: Session = Depends(get_db)):
-    license_obj = db.query(License).filter(License.licensenum == licensenum).first()
-    if not license_obj:
-        raise HTTPException(status_code=404, detail="Lesen tidak dijumpai / License not found")
+# =========================================================
+# PAY SINGLE LICENSE
+# =========================================================
 
-    # If end_date is in the past or today, start from today
+@router.post(
+    "/pay/{licensenum}",
+    response_model=LicenseResponse,
+)
+def pay_license(
+    licensenum: str,
+    db: Session = Depends(get_db),
+):
+    license_obj = (
+        db.query(License)
+        .filter(License.licensenum == licensenum)
+        .first()
+    )
+
+    if not license_obj:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Lesen tidak dijumpai / "
+                "License not found"
+            ),
+        )
+
     today = date.today()
-    if not license_obj.end_date or license_obj.end_date < today:
+
+    if (
+        not license_obj.end_date
+        or license_obj.end_date < today
+    ):
         license_obj.start_date = today
-        license_obj.end_date = today + timedelta(days=365)
+        license_obj.end_date = (
+            today + timedelta(days=365)
+        )
+
     else:
-        # Renew: extend end_date by 1 year from current end_date
-        license_obj.end_date = license_obj.end_date + timedelta(days=365)
+        license_obj.end_date = (
+            license_obj.end_date
+            + timedelta(days=365)
+        )
 
     db.commit()
     db.refresh(license_obj)
+
     return license_obj
 
 
-# Get all licenses
-@router.get("/", response_model=list[LicenseResponse])
-def get_licenses(db: Session = Depends(get_db)):
+# =========================================================
+# GET ALL LICENSES
+# =========================================================
+
+@router.get(
+    "/",
+    response_model=list[LicenseResponse],
+)
+def get_licenses(
+    db: Session = Depends(get_db),
+):
     return db.query(License).all()
 
-@router.post("/pay-multi")
-def pay_multiple_licenses(payload: dict, db: Session = Depends(get_db)):
-    """
-    Payload example:
-    {
-        "licenses": ["BIZ2025001", "BIZ2025002"]
-    }
-    """
 
+# =========================================================
+# PAY MULTIPLE LICENSES
+# =========================================================
+
+@router.post("/pay-multi")
+def pay_multiple_licenses(
+    payload: dict,
+    db: Session = Depends(get_db),
+):
     license_numbers = payload.get("licenses")
-    
-    if not isinstance(license_numbers, list):
+
+    if not isinstance(
+        license_numbers,
+        list,
+    ):
         raise HTTPException(
             status_code=400,
-            detail="licenses mesti dalam bentuk senarai nombor lesen / licenses must be a list of license numbers"
+            detail=(
+                "licenses mesti dalam bentuk senarai nombor lesen / "
+                "licenses must be a list of license numbers"
+            ),
         )
-    
-    license_numbers = [lic.strip() for lic in license_numbers if lic.strip()]
-    
+
+    license_numbers = [
+        str(license_number).strip()
+        for license_number in license_numbers
+        if str(license_number).strip()
+    ]
+
     if not license_numbers:
         raise HTTPException(
             status_code=400,
-            detail="Tiada nombor lesen yang sah diberikan / No valid license numbers provided"
+            detail=(
+                "Tiada nombor lesen yang sah diberikan / "
+                "No valid license numbers provided"
+            ),
         )
-    
 
     today = date.today()
     updated_licenses = []
     total_amount = 0.0
 
-    # --- Fetch & update licenses ---
-    for lic_no in license_numbers:
-        lic = db.query(License).filter(License.licensenum == lic_no).first()
-        if not lic:
-            raise HTTPException(status_code=404, detail=f"Lesen {lic_no} tidak dijumpai / License {lic_no} not found")
+    for license_number in license_numbers:
+        license_obj = (
+            db.query(License)
+            .filter(
+                License.licensenum
+                == license_number
+            )
+            .first()
+        )
 
-        # Renew logic
-        if not lic.end_date or lic.end_date < today:
-            lic.start_date = today
-            lic.end_date = today + timedelta(days=365)
+        if not license_obj:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"Lesen {license_number} tidak dijumpai / "
+                    f"License {license_number} not found"
+                ),
+            )
+
+        if (
+            not license_obj.end_date
+            or license_obj.end_date < today
+        ):
+            license_obj.start_date = today
+            license_obj.end_date = (
+                today + timedelta(days=365)
+            )
+
         else:
-            lic.end_date = lic.end_date + timedelta(days=365)
+            license_obj.end_date = (
+                license_obj.end_date
+                + timedelta(days=365)
+            )
 
-        total_amount += lic.amount
-        updated_licenses.append(lic)
+        total_amount += _safe_amount(
+            license_obj.amount
+        )
+
+        updated_licenses.append(
+            license_obj
+        )
 
     db.commit()
 
-    # Refresh all updated objects
-    for lic in updated_licenses:
-        db.refresh(lic)
+    for license_obj in updated_licenses:
+        db.refresh(license_obj)
 
     return {
-        "message": "Pembayaran pelbagai lesen berjaya / Multiple licenses paid successfully",
-        "total_amount": round(total_amount, 2),
-        "count": len(updated_licenses)
+        "message": (
+            "Pembayaran pelbagai lesen berjaya / "
+            "Multiple licenses paid successfully"
+        ),
+        "total_amount": round(
+            total_amount,
+            2,
+        ),
+        "count": len(updated_licenses),
     }
 
 
-# Get single license by number
-@router.get("/{licensenum}", response_model=LicenseResponse)
-def get_license(licensenum: str, db: Session = Depends(get_db)):
-    license_obj = db.query(License).filter(License.licensenum == licensenum).first()
+# =========================================================
+# GET SINGLE LICENSE
+# =========================================================
+
+@router.get(
+    "/{licensenum}",
+    response_model=LicenseResponse,
+)
+def get_license(
+    licensenum: str,
+    db: Session = Depends(get_db),
+):
+    license_obj = (
+        db.query(License)
+        .filter(License.licensenum == licensenum)
+        .first()
+    )
+
     if not license_obj:
-        raise HTTPException(status_code=404, detail="Lesen tidak dijumpai / License not found")
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Lesen tidak dijumpai / "
+                "License not found"
+            ),
+        )
+
     return license_obj
 
-# License receipt with QR
-@router.get("/receipt/qr/{licensenum}", response_class=HTMLResponse)
-def view_license_receipt(licensenum: str, db: Session = Depends(get_db)):
-    license_obj = db.query(License).filter(License.licensenum == licensenum).first()
-    if not license_obj:
-        raise HTTPException(status_code=404, detail="Lesen tidak dijumpai / License not found")
 
-    owner = db.query(OwnerLicense).filter(OwnerLicense.ic == license_obj.ic).first()
-    owner_name = owner.name if owner else "N/A"
+# =========================================================
+# SINGLE LICENSE RECEIPT
+# =========================================================
+
+@router.get(
+    "/receipt/qr/{licensenum}",
+    response_class=HTMLResponse,
+)
+def view_license_receipt(
+    licensenum: str,
+    db: Session = Depends(get_db),
+):
+    license_obj = (
+        db.query(License)
+        .filter(License.licensenum == licensenum)
+        .first()
+    )
+
+    if not license_obj:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Lesen tidak dijumpai / "
+                "License not found"
+            ),
+        )
+
+    owner = (
+        db.query(OwnerLicense)
+        .filter(OwnerLicense.ic == license_obj.ic)
+        .first()
+    )
+
+    owner_name = (
+        owner.name
+        if owner
+        else "N/A"
+    )
 
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(0, 10, "E-Resit Lesen / License E-Receipt", ln=True, align="C")
+
+    pdf.set_font(
+        "Arial",
+        "B",
+        16,
+    )
+
+    pdf.cell(
+        0,
+        10,
+        "E-Resit Lesen / License E-Receipt",
+        ln=True,
+        align="C",
+    )
+
     pdf.ln(10)
-    pdf.set_font("Arial", '', 12)
-    pdf.cell(0, 8, f"No. Lesen / License No: {license_obj.licensenum}", ln=True)
-    pdf.cell(0, 8, f"Jenis Lesen / License Type: {license_obj.licensetype}", ln=True)
-    pdf.cell(0, 8, f"No. IC Pemilik / Owner IC: {license_obj.ic}", ln=True)
-    pdf.cell(0, 8, f"Nama Pemilik / Owner Name: {owner_name}", ln=True)
-    pdf.cell(0, 8, f"Jumlah / Amount: RM {license_obj.amount:.2f}", ln=True)
-    pdf.cell(0, 8, f"Tarikh Mula / Start Date: {license_obj.start_date}", ln=True)
-    pdf.cell(0, 8, f"Tarikh Tamat / End Date: {license_obj.end_date}", ln=True)
 
-    pdf_bytes = pdf.output(dest="S").encode("latin1")
-    pdf_filename = f"license_{license_obj.licensenum}.pdf"
-    pdf_url = upload_to_blob(pdf_filename, pdf_bytes, content_type="application/pdf")
+    pdf.set_font(
+        "Arial",
+        "",
+        12,
+    )
 
-    html = f"""
-    <!DOCTYPE html>
-    <html lang="ms">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="color-scheme" content="only light">
-        <title>E-Resit Lesen / License E-Receipt</title>
+    pdf.cell(
+        0,
+        8,
+        (
+            f"No. Lesen / License No: "
+            f"{license_obj.licensenum}"
+        ),
+        ln=True,
+    )
 
-        <style>
-            * {{
-                box-sizing: border-box;
-            }}
+    pdf.cell(
+        0,
+        8,
+        (
+            f"Jenis Lesen / License Type: "
+            f"{license_obj.licensetype}"
+        ),
+        ln=True,
+    )
 
-            body {{
-                font-family: "Segoe UI", Arial, sans-serif;
-                background: #e8ebef;
-                color: #111827;
-                padding: 25px;
-                margin: 0;
-            }}
+    pdf.cell(
+        0,
+        8,
+        (
+            f"No. IC Pemilik / Owner IC: "
+            f"{license_obj.ic}"
+        ),
+        ln=True,
+    )
 
-            .receipt {{
-                background: #ffffff;
-                max-width: 750px;
-                margin: 0 auto;
-                border-radius: 16px;
-                overflow: hidden;
-                box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-            }}
+    pdf.cell(
+        0,
+        8,
+        (
+            f"Nama Pemilik / Owner Name: "
+            f"{owner_name}"
+        ),
+        ln=True,
+    )
 
-            .header {{
-                background: #2f80ed;
-                color: #ffffff;
-                padding: 24px;
-                text-align: center;
-            }}
+    pdf.cell(
+        0,
+        8,
+        (
+            f"Jumlah / Amount: "
+            f"RM {_safe_amount(license_obj.amount):.2f}"
+        ),
+        ln=True,
+    )
 
-            .header h1 {{
-                margin: 0;
-                font-size: 28px;
-            }}
+    pdf.cell(
+        0,
+        8,
+        (
+            f"Tarikh Mula / Start Date: "
+            f"{_format_date(license_obj.start_date)}"
+        ),
+        ln=True,
+    )
 
-            .header p {{
-                margin: 8px 0 0;
-                font-size: 15px;
-                opacity: 0.95;
-            }}
+    pdf.cell(
+        0,
+        8,
+        (
+            f"Tarikh Tamat / End Date: "
+            f"{_format_date(license_obj.end_date)}"
+        ),
+        ln=True,
+    )
 
-            .content {{
-                padding: 30px 35px;
-            }}
+    pdf_bytes = (
+        pdf.output(dest="S")
+        .encode("latin1")
+    )
 
-            .details {{
-                background: #f8faff;
-                border: 1px solid #e1e8f5;
-                border-radius: 12px;
-                padding: 12px 22px;
-            }}
+    pdf_filename = (
+        f"license_{license_obj.licensenum}.pdf"
+    )
 
-            .detail-row {{
-                display: flex;
-                justify-content: space-between;
-                gap: 20px;
-                padding: 13px 0;
-                border-bottom: 1px dashed #d6dce8;
-            }}
+    pdf_url = upload_to_blob(
+        pdf_filename,
+        pdf_bytes,
+        content_type="application/pdf",
+    )
 
-            .detail-row:last-child {{
-                border-bottom: none;
-            }}
+    receipt_html = _build_single_license_html(
+        license_obj,
+        owner_name,
+        pdf_url,
+    )
 
-            .label {{
-                font-weight: 700;
-                text-align: left;
-            }}
+    return HTMLResponse(
+        content=receipt_html
+    )
 
-            .value {{
-                text-align: right;
-                word-break: break-word;
-            }}
 
-            .amount {{
-                margin-top: 22px;
-                padding: 18px;
-                background: #eaf2ff;
-                border-left: 6px solid #2f80ed;
-                border-radius: 10px;
-                text-align: right;
-                font-size: 22px;
-                font-weight: 700;
-            }}
-
-            .amount span {{
-                color: #1d4ed8;
-                font-size: 26px;
-            }}
-
-            .thank-you {{
-                margin-top: 28px;
-                text-align: center;
-                color: #15803d;
-                font-size: 18px;
-                font-weight: 600;
-            }}
-
-            .pdf-button {{
-                margin-top: 28px;
-                text-align: center;
-            }}
-
-            .pdf-button a {{
-                display: inline-block;
-                background: #27ae60;
-                color: #ffffff;
-                padding: 13px 24px;
-                border-radius: 10px;
-                text-decoration: none;
-                font-size: 17px;
-                font-weight: 600;
-            }}
-
-            .footer {{
-                margin-top: 30px;
-                text-align: center;
-                color: #6b7280;
-                font-size: 13px;
-            }}
-
-            @media (max-width: 600px) {{
-                body {{
-                    padding: 12px;
-                }}
-
-                .content {{
-                    padding: 22px 18px;
-                }}
-
-                .detail-row {{
-                    display: block;
-                }}
-
-                .value {{
-                    margin-top: 5px;
-                    text-align: left;
-                }}
-            }}
-        </style>
-    </head>
-
-    <body>
-        <div class="receipt">
-            <div class="header">
-                <h1>E-Resit Lesen / License E-Receipt</h1>
-                <p>Rekod Transaksi Rasmi / Official Transaction Record</p>
-            </div>
-
-            <div class="content">
-                <div class="details">
-                    <div class="detail-row">
-                        <div class="label">No. Lesen / License No.</div>
-                        <div class="value">{license_obj.licensenum}</div>
-                    </div>
-
-                    <div class="detail-row">
-                        <div class="label">Jenis Lesen / License Type</div>
-                        <div class="value">{license_obj.licensetype}</div>
-                    </div>
-
-                    <div class="detail-row">
-                        <div class="label">No. IC Pemilik / Owner IC</div>
-                        <div class="value">{license_obj.ic}</div>
-                    </div>
-
-                    <div class="detail-row">
-                        <div class="label">Nama Pemilik / Owner Name</div>
-                        <div class="value">{owner_name}</div>
-                    </div>
-
-                    <div class="detail-row">
-                        <div class="label">Tarikh Mula / Start Date</div>
-                        <div class="value">{license_obj.start_date}</div>
-                    </div>
-
-                    <div class="detail-row">
-                        <div class="label">Tarikh Tamat / End Date</div>
-                        <div class="value">{license_obj.end_date}</div>
-                    </div>
-                </div>
-
-                <div class="amount">
-                    Jumlah Dibayar / Total Paid:
-                    <span>RM {license_obj.amount:.2f}</span>
-                </div>
-
-                <div class="thank-you">
-                    Terima kasih atas pembayaran anda.<br>
-                    Thank you for your payment.
-                </div>
-
-                <div class="pdf-button">
-                    <a href="{pdf_url}" target="_blank">
-                        Muat Turun Resit PDF / Download PDF Receipt
-                    </a>
-                </div>
-
-                <div class="footer">
-                    &copy; 2025 City Car Park System &bull;
-                    Hak Cipta Terpelihara / All Rights Reserved
-                </div>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html)
-
+# =========================================================
+# MULTIPLE LICENSE RECEIPT QR
+# =========================================================
 
 @router.post("/receipt/qr/multi")
-def generate_multi_license_receipt(payload: dict, db: Session = Depends(get_db)):
-    """
-    Payload example:
-    {
-        "licenses": ["BIZ2025001", "BIZ2025002"]
-    }
-    """
-
-    license_numbers = payload.get("licenses", [])
+def generate_multi_license_receipt(
+    payload: dict,
+    db: Session = Depends(get_db),
+):
+    license_numbers = payload.get(
+        "licenses",
+        [],
+    )
 
     if not license_numbers:
-        raise HTTPException(status_code=400, detail="Tiada nombor lesen diberikan / No license numbers provided")
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Tiada nombor lesen diberikan / "
+                "No license numbers provided"
+            ),
+        )
 
     licenses_data = []
     total_amount = 0.0
 
-    # --- Fetch all licenses from DB ---
-    for lic in license_numbers:
-        lic_obj = db.query(License).filter(License.licensenum == lic).first()
-        if not lic_obj:
-            raise HTTPException(status_code=404, detail=f"Lesen {lic} tidak dijumpai / License {lic} not found")
+    for license_number in license_numbers:
+        license_obj = (
+            db.query(License)
+            .filter(
+                License.licensenum
+                == license_number
+            )
+            .first()
+        )
 
-        owner = db.query(OwnerLicense).filter(OwnerLicense.ic == lic_obj.ic).first()
-        owner_name = owner.name if owner else "N/A"
+        if not license_obj:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"Lesen {license_number} tidak dijumpai / "
+                    f"License {license_number} not found"
+                ),
+            )
 
-        licenses_data.append({
-            "licensenumber": lic_obj.licensenum,
-            "licensetype": lic_obj.licensetype,
-            "expired_date": lic_obj.end_date,
-            "amount": lic_obj.amount,
-            "owner_name": owner_name,
-            "ic": lic_obj.ic
-        })
+        owner = (
+            db.query(OwnerLicense)
+            .filter(
+                OwnerLicense.ic
+                == license_obj.ic
+            )
+            .first()
+        )
 
-        total_amount += lic_obj.amount
+        owner_name = (
+            owner.name
+            if owner
+            else "N/A"
+        )
 
-    # === Generate PDF ===
-    pdf_buffer = generate_multi_license_pdf(licenses_data, total_amount)
-    pdf_filename = "multi_license_receipt.pdf"
+        licenses_data.append(
+            {
+                "licensenumber": (
+                    license_obj.licensenum
+                ),
+                "licensetype": (
+                    license_obj.licensetype
+                ),
+                "expired_date": (
+                    license_obj.end_date
+                ),
+                "amount": (
+                    license_obj.amount
+                ),
+                "owner_name": owner_name,
+                "ic": license_obj.ic,
+            }
+        )
+
+        total_amount += _safe_amount(
+            license_obj.amount
+        )
+
+    pdf_buffer = generate_multi_license_pdf(
+        licenses_data,
+        total_amount,
+    )
+
+    pdf_filename = (
+        "multi_license_receipt.pdf"
+    )
+
     pdf_url = upload_to_blob(
         pdf_filename,
         pdf_buffer.getvalue(),
-        content_type="application/pdf"
+        content_type="application/pdf",
     )
 
-    # --- Generate table rows ---
-    rows_html = ""
-    for c in licenses_data:
-        rows_html += f"""
-            <tr>
-                <td>{c['licensenumber']}</td>
-                <td>{c['licensetype']}</td>
-                <td>{c['expired_date']}</td>
-                <td>RM {float(c['amount']):.2f}</td>
-            </tr>
-        """
+    receipt_html = _build_multi_license_html(
+        licenses_data,
+        total_amount,
+        pdf_url,
+    )
 
-    # --- Bilingual HTML Receipt ---
-    html = f"""
-    <!DOCTYPE html>
-    <html lang="ms">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="color-scheme" content="only light">
+    html_filename = (
+        "multi_license_receipt.html"
+    )
 
-        <title>Resit Pelbagai Lesen / Multiple License Receipt</title>
+    html_url = upload_to_blob(
+        html_filename,
+        receipt_html.encode("utf-8"),
+        content_type="text/html",
+    )
 
-        <style>
-            * {{
-                box-sizing: border-box;
-            }}
-
-            body {{
-                font-family: "Segoe UI", Tahoma, Arial, sans-serif;
-                background: #e8ebef;
-                color: #111827;
-                padding: 25px;
-                margin: 0;
-            }}
-
-            .receipt {{
-                background: #ffffff;
-                padding: 35px;
-                max-width: 850px;
-                border-radius: 16px;
-                margin: 0 auto;
-                box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-            }}
-
-            .header {{
-                background: #2f80ed;
-                color: #ffffff;
-                padding: 22px 18px;
-                text-align: center;
-                border-radius: 12px;
-            }}
-
-            .header h1 {{
-                margin: 0;
-                font-size: 27px;
-            }}
-
-            .header p {{
-                margin: 8px 0 0;
-                font-size: 15px;
-                opacity: 0.95;
-            }}
-
-            .table-container {{
-                width: 100%;
-                overflow-x: auto;
-                margin-top: 25px;
-                border: 1px solid #e5e7eb;
-                border-radius: 10px;
-            }}
-
-            table {{
-                border-collapse: collapse;
-                width: 100%;
-                min-width: 700px;
-                white-space: nowrap;
-                table-layout: auto;
-            }}
-
-            th {{
-                background: #f5f8ff;
-                border-bottom: 2px solid #d9e2f2;
-                padding: 13px 12px;
-                font-size: 15px;
-                font-weight: 700;
-                text-align: center;
-                color: #1f2937;
-            }}
-
-            th small {{
-                display: block;
-                margin-top: 3px;
-                font-size: 12px;
-                font-weight: 500;
-                color: #4b5563;
-            }}
-
-            td {{
-                padding: 13px 12px;
-                text-align: center;
-                border-bottom: 1px solid #eeeeee;
-            }}
-
-            tbody tr:last-child td {{
-                border-bottom: none;
-            }}
-
-            tbody tr:nth-child(even) {{
-                background: #fafafa;
-            }}
-
-            .total {{
-                margin-top: 22px;
-                background: #f4f7ff;
-                padding: 17px;
-                font-size: 20px;
-                font-weight: 700;
-                border-left: 6px solid #2f80ed;
-                border-radius: 10px;
-                text-align: right;
-            }}
-
-            .total span {{
-                color: #1d4ed8;
-                font-size: 24px;
-            }}
-
-            .thank-you {{
-                margin-top: 28px;
-                text-align: center;
-                color: #15803d;
-                font-size: 18px;
-                font-weight: 600;
-            }}
-
-            .pdf-button {{
-                margin-top: 26px;
-                text-align: center;
-            }}
-
-            .pdf-button a {{
-                display: inline-block;
-                background: #27ae60;
-                padding: 13px 22px;
-                color: #ffffff;
-                font-size: 17px;
-                font-weight: 600;
-                border-radius: 10px;
-                text-decoration: none;
-            }}
-
-            .footer {{
-                margin-top: 30px;
-                text-align: center;
-                color: #6b7280;
-                font-size: 13px;
-            }}
-
-            @media (max-width: 600px) {{
-                body {{
-                    padding: 12px;
-                }}
-
-                .receipt {{
-                    padding: 20px 15px;
-                }}
-
-                .header h1 {{
-                    font-size: 22px;
-                }}
-            }}
-        </style>
-    </head>
-
-    <body>
-        <div class="receipt">
-            <div class="header">
-                <h1>Resit Pelbagai Lesen / Multiple License Receipt</h1>
-                <p>Rekod Transaksi Rasmi / Official Transaction Record</p>
-            </div>
-
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>
-                                No. Lesen
-                                <small>License Number</small>
-                            </th>
-
-                            <th>
-                                Jenis Lesen
-                                <small>License Type</small>
-                            </th>
-
-                            <th>
-                                Tarikh Luput
-                                <small>Expiry Date</small>
-                            </th>
-
-                            <th>
-                                Jumlah (RM)
-                                <small>Amount (RM)</small>
-                            </th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        {rows_html}
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="total">
-                Jumlah Keseluruhan / Total Amount:
-                <span>RM {float(total_amount):.2f}</span>
-            </div>
-
-            <div class="thank-you">
-                Terima kasih atas pembayaran anda.<br>
-                Thank you for your payment.
-            </div>
-
-            <div class="pdf-button">
-                <a href="{pdf_url}" target="_blank">
-                    Muat Turun Resit PDF / Download PDF Receipt
-                </a>
-            </div>
-
-            <div class="footer">
-                &copy; 2025 City Car Park System &bull;
-                Hak Cipta Terpelihara / All Rights Reserved
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-
-    # --- Upload HTML ---
-    html_bytes = html.encode("utf-8")
-    filename = "multi_license_receipt.html"
-    blob_url = upload_to_blob(filename, html_bytes, content_type="text/html")
-
-    # --- Generate QR ---
-    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L)
-    qr.add_data(blob_url)
-    qr.make(fit=True)
-
-    img = qr.make_image(fill_color="black", back_color="white")
-    buf = BytesIO()
-    img.save(buf, "PNG")
-    buf.seek(0)
-
-    return StreamingResponse(buf, media_type="image/png")
+    return _generate_qr_response(
+        html_url
+    )
 
 
+# =========================================================
+# GET LICENSES BY OWNER IC
+# =========================================================
 
+@router.get(
+    "/by-ic/{ic}",
+    response_model=list[LicenseResponse],
+)
+def get_licenses_by_ic(
+    ic: str,
+    db: Session = Depends(get_db),
+):
+    owner = (
+        db.query(OwnerLicense)
+        .filter(OwnerLicense.ic == ic)
+        .first()
+    )
 
-# Get all licenses by owner IC
-@router.get("/by-ic/{ic}", response_model=list[LicenseResponse])
-def get_licenses_by_ic(ic: str, db: Session = Depends(get_db)):
-    # Check if owner exists
-    owner = db.query(OwnerLicense).filter(OwnerLicense.ic == ic).first()
     if not owner:
-        raise HTTPException(status_code=404, detail="Pemilik tidak dijumpai / Owner not found")
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Pemilik tidak dijumpai / "
+                "Owner not found"
+            ),
+        )
 
-    # Get all licenses for this owner
-    licenses = db.query(License).filter(License.ic == ic).all()
+    licenses = (
+        db.query(License)
+        .filter(License.ic == ic)
+        .all()
+    )
+
     return licenses

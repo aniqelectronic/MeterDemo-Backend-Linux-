@@ -130,7 +130,7 @@ def generate_multi_tax_pdf(Taxes, total_amount):
     # ===== FOOTER =====
     pdf.setFont("Helvetica", 9)
     pdf.setFillColor(colors.grey)
-    pdf.drawCentredString(width / 2, 30, "2025 City Car Park System . All Rights Reserved")
+    pdf.drawCentredString(width / 2, 30, "2026 Juara Inovasi Pintar System . All Rights Reserved")
 
     pdf.save()
     buffer.seek(0)

@@ -24,22 +24,22 @@ from app.schema.compound.compound_schema import Compound, MultiCompound
 from app.utils.blob_upload import upload_to_blob
 
 
-router = APIRouter(prefix="/compound", tags=["Compound"])
+router = APIRouter(
+    prefix="/compound",
+    tags=["Compound"],
+)
 
 
 # =====================================================
-# HELPER FUNCTIONS
+# HELPERS
 # =====================================================
 
 def safe_html(value, fallback="-"):
-    """
-    Convert a value to escaped HTML text.
-    This prevents special characters from breaking the receipt HTML.
-    """
     if value is None:
         return fallback
 
     text = str(value).strip()
+
     if not text:
         return fallback
 
@@ -47,9 +47,6 @@ def safe_html(value, fallback="-"):
 
 
 def safe_amount(value):
-    """
-    Convert an amount safely to float.
-    """
     try:
         return float(value or 0)
     except (TypeError, ValueError):
@@ -57,9 +54,6 @@ def safe_amount(value):
 
 
 def format_date(value):
-    """
-    Format a date as DD/MM/YYYY when possible.
-    """
     if value is None:
         return "-"
 
@@ -70,9 +64,6 @@ def format_date(value):
 
 
 def format_time(value):
-    """
-    Format a time as 12-hour time with AM/PM when possible.
-    """
     if value is None:
         return "-"
 
@@ -83,9 +74,6 @@ def format_time(value):
 
 
 def generate_qr_response(receipt_url: str):
-    """
-    Generate a QR PNG response pointing to the uploaded HTML receipt.
-    """
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -111,29 +99,991 @@ def generate_qr_response(receipt_url: str):
     )
 
 
+def build_single_compound_html(
+    compound_name,
+    compound_no,
+    compound_plate,
+    compound_date,
+    compound_time,
+    compound_offense,
+    compound_amount,
+    pdf_url,
+):
+    return f"""
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <meta name="color-scheme" content="only light">
+
+    <title>
+        E-Resit Kompaun /
+        Compound E-Receipt
+    </title>
+
+    <style>
+        * {{
+            box-sizing: border-box;
+        }}
+
+        html {{
+            color-scheme: only light;
+            background: #eef3f8;
+        }}
+
+        body {{
+            margin: 0;
+            padding: 28px 16px;
+            min-height: 100vh;
+            background:
+                linear-gradient(
+                    180deg,
+                    #eaf2ff 0%,
+                    #f7f9fc 100%
+                );
+            color: #111827;
+            font-family:
+                "Segoe UI",
+                Arial,
+                sans-serif;
+        }}
+
+        .page {{
+            width: 100%;
+            max-width: 860px;
+            margin: 0 auto;
+        }}
+
+        .receipt {{
+            background: #ffffff;
+            border: 1px solid #dfe7f2;
+            border-radius: 22px;
+            overflow: hidden;
+            box-shadow:
+                0 18px 45px
+                rgba(15, 23, 42, 0.12);
+        }}
+
+        .header {{
+            position: relative;
+            overflow: hidden;
+            padding: 34px 30px;
+            text-align: center;
+            color: #ffffff;
+            background:
+                linear-gradient(
+                    135deg,
+                    #003b8e,
+                    #0a66d8
+                );
+        }}
+
+        .header::after {{
+            content: "";
+            position: absolute;
+            width: 220px;
+            height: 220px;
+            right: -70px;
+            top: -90px;
+            border-radius: 50%;
+            background:
+                rgba(255, 255, 255, 0.08);
+        }}
+
+        .header-content {{
+            position: relative;
+            z-index: 1;
+        }}
+
+        .ms {{
+            font-weight: 700;
+        }}
+
+        .en {{
+            margin-top: 3px;
+            font-style: italic;
+            font-weight: 400;
+            color: #6b7280;
+            font-size: 0.88em;
+        }}
+
+        .header .ms {{
+            color: #ffffff;
+        }}
+
+        .header .en {{
+            color:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    0.86
+                );
+        }}
+
+        .title .ms {{
+            font-size: 30px;
+            line-height: 1.1;
+        }}
+
+        .title .en {{
+            margin-top: 7px;
+            font-size: 17px;
+        }}
+
+        .subtitle {{
+            margin-top: 15px;
+        }}
+
+        .content {{
+            padding: 30px;
+        }}
+
+        .summary-grid {{
+            display: grid;
+            grid-template-columns:
+                repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }}
+
+        .summary-card {{
+            padding: 16px;
+            border: 1px solid #dce8f8;
+            border-radius: 14px;
+            background: #f8fbff;
+        }}
+
+        .summary-card.full {{
+            grid-column: 1 / -1;
+        }}
+
+        .label {{
+            margin-bottom: 8px;
+        }}
+
+        .label .ms {{
+            color: #0f3f83;
+            font-size: 14px;
+        }}
+
+        .label .en {{
+            font-size: 12px;
+        }}
+
+        .value {{
+            color: #111827;
+            font-size: 16px;
+            font-weight: 600;
+            line-height: 1.45;
+            word-break: break-word;
+        }}
+
+        .amount-card {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            margin-top: 22px;
+            padding: 20px 22px;
+            border: 1px solid #bfd7ff;
+            border-left: 6px solid #0a66d8;
+            border-radius: 16px;
+            background:
+                linear-gradient(
+                    135deg,
+                    #eaf3ff,
+                    #f5f9ff
+                );
+        }}
+
+        .amount-label .ms {{
+            color: #0f3f83;
+            font-size: 17px;
+        }}
+
+        .amount-label .en {{
+            font-size: 13px;
+        }}
+
+        .amount-value {{
+            color: #0a56c2;
+            font-size: 30px;
+            font-weight: 800;
+            white-space: nowrap;
+        }}
+
+        .thankyou {{
+            margin-top: 28px;
+            text-align: center;
+            color: #15803d;
+        }}
+
+        .thankyou .ms {{
+            font-size: 19px;
+        }}
+
+        .thankyou .en {{
+            color: #2f855a;
+            font-size: 14px;
+        }}
+
+        .download-btn {{
+            margin-top: 28px;
+            text-align: center;
+        }}
+
+        .download-btn a {{
+            display: inline-block;
+            min-width: 260px;
+            padding: 14px 24px;
+            border-radius: 12px;
+            background:
+                linear-gradient(
+                    135deg,
+                    #16a34a,
+                    #22c55e
+                );
+            color: #ffffff;
+            text-decoration: none;
+            box-shadow:
+                0 8px 18px
+                rgba(34, 197, 94, 0.25);
+        }}
+
+        .download-btn .ms,
+        .download-btn .en {{
+            color: #ffffff;
+        }}
+
+        .footer {{
+            margin-top: 30px;
+            padding-top: 22px;
+            border-top: 1px solid #e5e7eb;
+            text-align: center;
+            color: #6b7280;
+            font-size: 13px;
+            line-height: 1.5;
+        }}
+
+        .footer .ms {{
+            color: #374151;
+        }}
+
+        @media (max-width: 680px) {{
+            body {{
+                padding: 12px;
+            }}
+
+            .header {{
+                padding: 28px 18px;
+            }}
+
+            .title .ms {{
+                font-size: 24px;
+            }}
+
+            .title .en {{
+                font-size: 15px;
+            }}
+
+            .content {{
+                padding: 20px 16px;
+            }}
+
+            .summary-grid {{
+                grid-template-columns: 1fr;
+            }}
+
+            .summary-card.full {{
+                grid-column: auto;
+            }}
+
+            .amount-card {{
+                display: block;
+                text-align: center;
+            }}
+
+            .amount-value {{
+                margin-top: 10px;
+                font-size: 27px;
+            }}
+
+            .download-btn a {{
+                width: 100%;
+                min-width: 0;
+            }}
+        }}
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <div class="receipt">
+            <div class="header">
+                <div class="header-content">
+                    <div class="title">
+                        <div class="ms">
+                            E-Resit Kompaun
+                        </div>
+
+                        <div class="en">
+                            Compound E-Receipt
+                        </div>
+                    </div>
+
+                    <div class="subtitle">
+                        <div class="ms">
+                            Rekod Transaksi Rasmi
+                        </div>
+
+                        <div class="en">
+                            Official Transaction Record
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content">
+                <div class="summary-grid">
+                    <div class="summary-card">
+                        <div class="label">
+                            <div class="ms">Nama</div>
+                            <div class="en">Name</div>
+                        </div>
+
+                        <div class="value">
+                            {compound_name}
+                        </div>
+                    </div>
+
+                    <div class="summary-card">
+                        <div class="label">
+                            <div class="ms">
+                                No. Kompaun
+                            </div>
+
+                            <div class="en">
+                                Compound No.
+                            </div>
+                        </div>
+
+                        <div class="value">
+                            {compound_no}
+                        </div>
+                    </div>
+
+                    <div class="summary-card">
+                        <div class="label">
+                            <div class="ms">
+                                No. Plat
+                            </div>
+
+                            <div class="en">
+                                Plate No.
+                            </div>
+                        </div>
+
+                        <div class="value">
+                            {compound_plate}
+                        </div>
+                    </div>
+
+                    <div class="summary-card">
+                        <div class="label">
+                            <div class="ms">
+                                Tarikh
+                            </div>
+
+                            <div class="en">
+                                Date
+                            </div>
+                        </div>
+
+                        <div class="value">
+                            {compound_date}
+                        </div>
+                    </div>
+
+                    <div class="summary-card">
+                        <div class="label">
+                            <div class="ms">
+                                Masa
+                            </div>
+
+                            <div class="en">
+                                Time
+                            </div>
+                        </div>
+
+                        <div class="value">
+                            {compound_time}
+                        </div>
+                    </div>
+
+                    <div class="summary-card full">
+                        <div class="label">
+                            <div class="ms">
+                                Kesalahan
+                            </div>
+
+                            <div class="en">
+                                Offense
+                            </div>
+                        </div>
+
+                        <div class="value">
+                            {compound_offense}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="amount-card">
+                    <div class="amount-label">
+                        <div class="ms">
+                            Jumlah Dibayar
+                        </div>
+
+                        <div class="en">
+                            Total Paid
+                        </div>
+                    </div>
+
+                    <div class="amount-value">
+                        RM {compound_amount:,.2f}
+                    </div>
+                </div>
+
+                <div class="thankyou">
+                    <div class="ms">
+                        Terima kasih atas pembayaran anda.
+                    </div>
+
+                    <div class="en">
+                        Thank you for your payment.
+                    </div>
+                </div>
+
+                <div class="download-btn">
+                    <a
+                        href="{pdf_url}"
+                        target="_blank"
+                    >
+                        <div class="ms">
+                            Muat Turun Resit PDF
+                        </div>
+
+                        <div class="en">
+                            Download PDF Receipt
+                        </div>
+                    </a>
+                </div>
+
+                <div class="footer">
+                    <div class="ms">
+                        © 2026 Juara Inovasi Pintar System
+                        · Hak Cipta Terpelihara
+                    </div>
+
+                    <div class="en">
+                        All Rights Reserved
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+
+def build_multi_compound_html(
+    compounds,
+    total_amount,
+    pdf_url,
+):
+    rows_html = ""
+
+    for compound in compounds:
+        compound_number = safe_html(
+            compound.get("compoundnum")
+        )
+
+        amount = safe_amount(
+            compound.get("amount")
+        )
+
+        rows_html += f"""
+        <tr>
+            <td>{compound_number}</td>
+
+            <td class="money">
+                RM {amount:,.2f}
+            </td>
+        </tr>
+        """
+
+    return f"""
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <meta name="color-scheme" content="only light">
+
+    <title>
+        Resit Pelbagai Kompaun /
+        Multiple Compound Receipt
+    </title>
+
+    <style>
+        * {{
+            box-sizing: border-box;
+        }}
+
+        html {{
+            color-scheme: only light;
+            background: #eef3f8;
+        }}
+
+        body {{
+            margin: 0;
+            padding: 28px 16px;
+            min-height: 100vh;
+            background:
+                linear-gradient(
+                    180deg,
+                    #eaf2ff 0%,
+                    #f7f9fc 100%
+                );
+            color: #111827;
+            font-family:
+                "Segoe UI",
+                Arial,
+                sans-serif;
+        }}
+
+        .page {{
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto;
+        }}
+
+        .receipt {{
+            background: #ffffff;
+            border: 1px solid #dfe7f2;
+            border-radius: 22px;
+            overflow: hidden;
+            box-shadow:
+                0 18px 45px
+                rgba(15, 23, 42, 0.12);
+        }}
+
+        .header {{
+            position: relative;
+            overflow: hidden;
+            padding: 34px 30px;
+            text-align: center;
+            color: #ffffff;
+            background:
+                linear-gradient(
+                    135deg,
+                    #003b8e,
+                    #0a66d8
+                );
+        }}
+
+        .header::after {{
+            content: "";
+            position: absolute;
+            width: 220px;
+            height: 220px;
+            right: -70px;
+            top: -90px;
+            border-radius: 50%;
+            background:
+                rgba(255, 255, 255, 0.08);
+        }}
+
+        .header-content {{
+            position: relative;
+            z-index: 1;
+        }}
+
+        .ms {{
+            font-weight: 700;
+        }}
+
+        .en {{
+            margin-top: 3px;
+            font-style: italic;
+            font-weight: 400;
+            color: #6b7280;
+            font-size: 0.88em;
+        }}
+
+        .header .ms {{
+            color: #ffffff;
+        }}
+
+        .header .en {{
+            color:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    0.86
+                );
+        }}
+
+        .title .ms {{
+            font-size: 30px;
+            line-height: 1.1;
+        }}
+
+        .title .en {{
+            margin-top: 7px;
+            font-size: 17px;
+        }}
+
+        .subtitle {{
+            margin-top: 15px;
+        }}
+
+        .content {{
+            padding: 30px;
+        }}
+
+        .table-container {{
+            width: 100%;
+            overflow-x: auto;
+            border: 1px solid #dce8f8;
+            border-radius: 14px;
+        }}
+
+        table {{
+            width: 100%;
+            min-width: 560px;
+            border-collapse: collapse;
+        }}
+
+        th {{
+            padding: 14px 13px;
+            text-align: left;
+            color: #ffffff;
+            background: #0a66d8;
+        }}
+
+        th .ms {{
+            color: #ffffff;
+        }}
+
+        th .en {{
+            color:
+                rgba(
+                    255,
+                    255,
+                    255,
+                    0.85
+                );
+            font-size: 11px;
+        }}
+
+        td {{
+            padding: 14px 13px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 14px;
+        }}
+
+        tbody tr:nth-child(even) {{
+            background: #f8fbff;
+        }}
+
+        tbody tr:last-child td {{
+            border-bottom: none;
+        }}
+
+        .money {{
+            text-align: right;
+            white-space: nowrap;
+            color: #0a56c2;
+            font-weight: 700;
+        }}
+
+        .total-card {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            margin-top: 22px;
+            padding: 20px 22px;
+            border: 1px solid #bfd7ff;
+            border-left: 6px solid #0a66d8;
+            border-radius: 16px;
+            background:
+                linear-gradient(
+                    135deg,
+                    #eaf3ff,
+                    #f5f9ff
+                );
+        }}
+
+        .total-label .ms {{
+            color: #0f3f83;
+            font-size: 17px;
+        }}
+
+        .total-label .en {{
+            font-size: 13px;
+        }}
+
+        .total-value {{
+            color: #0a56c2;
+            font-size: 30px;
+            font-weight: 800;
+            white-space: nowrap;
+        }}
+
+        .thankyou {{
+            margin-top: 28px;
+            text-align: center;
+            color: #15803d;
+        }}
+
+        .thankyou .ms {{
+            font-size: 19px;
+        }}
+
+        .thankyou .en {{
+            color: #2f855a;
+            font-size: 14px;
+        }}
+
+        .pdf-button {{
+            margin-top: 28px;
+            text-align: center;
+        }}
+
+        .pdf-button a {{
+            display: inline-block;
+            min-width: 260px;
+            padding: 14px 24px;
+            border-radius: 12px;
+            background:
+                linear-gradient(
+                    135deg,
+                    #16a34a,
+                    #22c55e
+                );
+            color: #ffffff;
+            text-decoration: none;
+            box-shadow:
+                0 8px 18px
+                rgba(34, 197, 94, 0.25);
+        }}
+
+        .pdf-button .ms,
+        .pdf-button .en {{
+            color: #ffffff;
+        }}
+
+        .footer {{
+            margin-top: 30px;
+            padding-top: 22px;
+            border-top: 1px solid #e5e7eb;
+            text-align: center;
+            color: #6b7280;
+            font-size: 13px;
+            line-height: 1.5;
+        }}
+
+        .footer .ms {{
+            color: #374151;
+        }}
+
+        @media (max-width: 680px) {{
+            body {{
+                padding: 12px;
+            }}
+
+            .header {{
+                padding: 28px 18px;
+            }}
+
+            .title .ms {{
+                font-size: 24px;
+            }}
+
+            .title .en {{
+                font-size: 15px;
+            }}
+
+            .content {{
+                padding: 20px 16px;
+            }}
+
+            .total-card {{
+                display: block;
+                text-align: center;
+            }}
+
+            .total-value {{
+                margin-top: 10px;
+                font-size: 27px;
+            }}
+
+            .pdf-button a {{
+                width: 100%;
+                min-width: 0;
+            }}
+        }}
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <div class="receipt">
+            <div class="header">
+                <div class="header-content">
+                    <div class="title">
+                        <div class="ms">
+                            Resit Pelbagai Kompaun
+                        </div>
+
+                        <div class="en">
+                            Multiple Compound Receipt
+                        </div>
+                    </div>
+
+                    <div class="subtitle">
+                        <div class="ms">
+                            Rekod Transaksi Rasmi
+                        </div>
+
+                        <div class="en">
+                            Official Transaction Record
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>
+                                    <div class="ms">
+                                        No. Kompaun
+                                    </div>
+
+                                    <div class="en">
+                                        Compound Number
+                                    </div>
+                                </th>
+
+                                <th style="text-align: right;">
+                                    <div class="ms">
+                                        Jumlah (RM)
+                                    </div>
+
+                                    <div class="en">
+                                        Amount (RM)
+                                    </div>
+                                </th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {rows_html}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="total-card">
+                    <div class="total-label">
+                        <div class="ms">
+                            Jumlah Keseluruhan
+                        </div>
+
+                        <div class="en">
+                            Total Amount
+                        </div>
+                    </div>
+
+                    <div class="total-value">
+                        RM {safe_amount(total_amount):,.2f}
+                    </div>
+                </div>
+
+                <div class="thankyou">
+                    <div class="ms">
+                        Terima kasih atas pembayaran anda.
+                    </div>
+
+                    <div class="en">
+                        Thank you for your payment.
+                    </div>
+                </div>
+
+                <div class="pdf-button">
+                    <a
+                        href="{pdf_url}"
+                        target="_blank"
+                    >
+                        <div class="ms">
+                            Muat Turun Resit PDF
+                        </div>
+
+                        <div class="en">
+                            Download PDF Receipt
+                        </div>
+                    </a>
+                </div>
+
+                <div class="footer">
+                    <div class="ms">
+                        © 2026 Juara Inovasi Pintar System
+                        · Hak Cipta Terpelihara
+                    </div>
+
+                    <div class="en">
+                        All Rights Reserved
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+
 # =====================================================
 # CREATE COMPOUND
 # =====================================================
 
-@router.post("/", response_model=CompoundResponse)
+@router.post(
+    "/",
+    response_model=CompoundResponse,
+)
 def create_compound(
     compound: CompoundCreate,
     db: Session = Depends(get_db),
 ):
-    """
-    Dummy testing payload example:
-
-    {
-        "compoundnum": "MBMBCMP2025000123",
-        "plate": "ABC1234",
-        "date": "2025-09-22",
-        "time": "15:45:00",
-        "offense": "Illegal Parking",
-        "amount": 50.0
-    }
-    """
-
-    new_compound = Compound(**compound.dict())
+    new_compound = Compound(
+        **compound.dict()
+    )
 
     db.add(new_compound)
     db.commit()
@@ -146,14 +1096,19 @@ def create_compound(
 # PAY SINGLE COMPOUND
 # =====================================================
 
-@router.post("/pay/{compoundnum}", response_model=CompoundResponse)
+@router.post(
+    "/pay/{compoundnum}",
+    response_model=CompoundResponse,
+)
 def pay_compound(
     compoundnum: str,
     db: Session = Depends(get_db),
 ):
     compound = (
         db.query(Compound)
-        .filter_by(compoundnum=compoundnum)
+        .filter_by(
+            compoundnum=compoundnum
+        )
         .first()
     )
 
@@ -166,7 +1121,10 @@ def pay_compound(
             ),
         )
 
-    if compound.status == StatusTypeEnum.paid:
+    if (
+        compound.status
+        == StatusTypeEnum.paid
+    ):
         raise HTTPException(
             status_code=400,
             detail=(
@@ -175,7 +1133,9 @@ def pay_compound(
             ),
         )
 
-    compound.status = StatusTypeEnum.paid
+    compound.status = (
+        StatusTypeEnum.paid
+    )
 
     db.commit()
     db.refresh(compound)
@@ -187,8 +1147,13 @@ def pay_compound(
 # GET ALL COMPOUNDS
 # =====================================================
 
-@router.get("/", response_model=list[CompoundResponse])
-def get_compounds(db: Session = Depends(get_db)):
+@router.get(
+    "/",
+    response_model=list[CompoundResponse],
+)
+def get_compounds(
+    db: Session = Depends(get_db),
+):
     return db.query(Compound).all()
 
 
@@ -197,7 +1162,9 @@ def get_compounds(db: Session = Depends(get_db)):
 # =====================================================
 
 @router.post("/receipt/qr/single")
-def view_compound_receipt(body: CompoundCreate):
+def view_compound_receipt(
+    body: CompoundCreate,
+):
     if not body.compoundnum:
         raise HTTPException(
             status_code=400,
@@ -215,277 +1182,36 @@ def view_compound_receipt(body: CompoundCreate):
     compound_offense = safe_html(body.offense)
     compound_amount = safe_amount(body.amount)
 
-    # Generate bilingual PDF from compound_receipt.py
-    pdf_url = generate_single_compound_pdf(body)
+    pdf_url = generate_single_compound_pdf(
+        body
+    )
 
-    html_content = f"""
-    <!DOCTYPE html>
-    <html lang="ms">
-    <head>
-        <meta charset="utf-8">
-        <meta
-            name="viewport"
-            content="width=device-width, initial-scale=1"
-        >
-        <meta name="color-scheme" content="only light">
+    receipt_html = (
+        build_single_compound_html(
+            compound_name=compound_name,
+            compound_no=compound_no,
+            compound_plate=compound_plate,
+            compound_date=compound_date,
+            compound_time=compound_time,
+            compound_offense=compound_offense,
+            compound_amount=compound_amount,
+            pdf_url=pdf_url,
+        )
+    )
 
-        <title>E-Resit Kompaun / Compound E-Receipt</title>
-
-        <style>
-            * {{
-                box-sizing: border-box;
-            }}
-
-            body {{
-                font-family: "Segoe UI", Tahoma, Arial, sans-serif;
-                background: #eceff1;
-                color: #111827;
-                margin: 0;
-                padding: 25px;
-                display: flex;
-                justify-content: center;
-            }}
-
-            .receipt {{
-                background: #ffffff;
-                border-radius: 16px;
-                padding: 30px 35px;
-                width: 100%;
-                max-width: 700px;
-                box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
-            }}
-
-            .header {{
-                background: #2f80ed;
-                color: #ffffff;
-                padding: 22px;
-                border-radius: 12px;
-                text-align: center;
-            }}
-
-            .header h1 {{
-                margin: 0;
-                font-size: 27px;
-            }}
-
-            .header p {{
-                margin: 8px 0 0;
-                font-size: 15px;
-                opacity: 0.95;
-            }}
-
-            .info-section {{
-                margin-top: 25px;
-                font-size: 17px;
-                background: #f9fbff;
-                border: 1px solid #e1e8f5;
-                border-radius: 12px;
-                padding: 8px 20px;
-            }}
-
-            .info-row {{
-                display: flex;
-                justify-content: space-between;
-                gap: 20px;
-                padding: 12px 0;
-                border-bottom: 1px dashed #d8dee9;
-            }}
-
-            .info-row:last-child {{
-                border-bottom: none;
-            }}
-
-            .info-label {{
-                font-weight: 700;
-                text-align: left;
-            }}
-
-            .info-value {{
-                text-align: right;
-                word-break: break-word;
-            }}
-
-            .amount-box {{
-                margin-top: 25px;
-                padding: 18px;
-                background: #f4f7ff;
-                border-left: 6px solid #2f80ed;
-                border-radius: 10px;
-                font-size: 20px;
-                font-weight: 700;
-                color: #111827;
-                text-align: right;
-            }}
-
-            .amount-box span {{
-                color: #1d4ed8;
-                font-size: 25px;
-            }}
-
-            .thankyou {{
-                margin-top: 30px;
-                font-size: 18px;
-                font-weight: 700;
-                color: #15803d;
-                text-align: center;
-                line-height: 1.5;
-            }}
-
-            .download-btn {{
-                margin-top: 30px;
-                text-align: center;
-            }}
-
-            .download-btn a {{
-                display: inline-block;
-                background: #27ae60;
-                padding: 13px 25px;
-                font-size: 17px;
-                font-weight: 600;
-                color: #ffffff;
-                border-radius: 10px;
-                text-decoration: none;
-            }}
-
-            .footer {{
-                margin-top: 28px;
-                text-align: center;
-                font-size: 13px;
-                color: #6b7280;
-            }}
-
-            @media (max-width: 600px) {{
-                body {{
-                    padding: 12px;
-                }}
-
-                .receipt {{
-                    padding: 22px 18px;
-                }}
-
-                .header h1 {{
-                    font-size: 22px;
-                }}
-
-                .info-row {{
-                    display: block;
-                }}
-
-                .info-value {{
-                    margin-top: 5px;
-                    text-align: left;
-                }}
-
-                .amount-box {{
-                    text-align: center;
-                }}
-            }}
-        </style>
-    </head>
-
-    <body>
-        <div class="receipt">
-            <div class="header">
-                <h1>E-Resit Kompaun / Compound E-Receipt</h1>
-                <p>
-                    Rekod Transaksi Rasmi /
-                    Official Transaction Record
-                </p>
-            </div>
-
-            <div class="info-section">
-                <div class="info-row">
-                    <span class="info-label">
-                        Nama / Name
-                    </span>
-                    <span class="info-value">
-                        {compound_name}
-                    </span>
-                </div>
-
-                <div class="info-row">
-                    <span class="info-label">
-                        No. Kompaun / Compound No.
-                    </span>
-                    <span class="info-value">
-                        {compound_no}
-                    </span>
-                </div>
-
-                <div class="info-row">
-                    <span class="info-label">
-                        No. Plat / Plate No.
-                    </span>
-                    <span class="info-value">
-                        {compound_plate}
-                    </span>
-                </div>
-
-                <div class="info-row">
-                    <span class="info-label">
-                        Tarikh / Date
-                    </span>
-                    <span class="info-value">
-                        {compound_date}
-                    </span>
-                </div>
-
-                <div class="info-row">
-                    <span class="info-label">
-                        Masa / Time
-                    </span>
-                    <span class="info-value">
-                        {compound_time}
-                    </span>
-                </div>
-
-                <div class="info-row">
-                    <span class="info-label">
-                        Kesalahan / Offense
-                    </span>
-                    <span class="info-value">
-                        {compound_offense}
-                    </span>
-                </div>
-            </div>
-
-            <div class="amount-box">
-                Jumlah Dibayar / Total Paid:
-                <span>RM {compound_amount:.2f}</span>
-            </div>
-
-            <div class="thankyou">
-                Terima kasih atas pembayaran anda.<br>
-                Thank you for your payment.
-            </div>
-
-            <div class="download-btn">
-                <a href="{pdf_url}" target="_blank">
-                    Muat Turun Resit PDF /
-                    Download PDF Receipt
-                </a>
-            </div>
-
-            <div class="footer">
-                &copy; 2025 City Car Park System &bull;
-                Hak Cipta Terpelihara /
-                All Rights Reserved
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-
-    html_bytes = html_content.encode("utf-8")
-    html_filename = f"compound_{compound_no}.html"
+    html_filename = (
+        f"compound_{compound_no}.html"
+    )
 
     html_url = upload_to_blob(
         html_filename,
-        html_bytes,
+        receipt_html.encode("utf-8"),
         content_type="text/html",
     )
 
-    return generate_qr_response(html_url)
+    return generate_qr_response(
+        html_url
+    )
 
 
 # =====================================================
@@ -504,7 +1230,8 @@ def get_unpaid_compounds_by_plate(
         db.query(Compound)
         .filter(
             Compound.plate == plate,
-            Compound.status == StatusTypeEnum.unpaid,
+            Compound.status
+            == StatusTypeEnum.unpaid,
         )
         .all()
     )
@@ -534,21 +1261,6 @@ def pay_multiple_compounds(
     payload: list[MultiCompoundCreate],
     db: Session = Depends(get_db),
 ):
-    """
-    Example payload:
-
-    [
-        {
-            "transaction_bank_id": "BANKTXN123456",
-            "compoundnum": "MBMBCMP2025000123"
-        },
-        {
-            "transaction_bank_id": "BANKTXN123456",
-            "compoundnum": "MBMBCMP2025000456"
-        }
-    ]
-    """
-
     if not payload:
         raise HTTPException(
             status_code=400,
@@ -558,23 +1270,32 @@ def pay_multiple_compounds(
             ),
         )
 
-    transaction_id = payload[0].transaction_bank_id
+    transaction_id = (
+        payload[0].transaction_bank_id
+    )
+
     saved_entries = []
 
     for item in payload:
-        if item.transaction_bank_id != transaction_id:
+        if (
+            item.transaction_bank_id
+            != transaction_id
+        ):
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    "Semua kompaun mesti menggunakan ID transaksi "
-                    "bank yang sama / "
-                    "All compounds must use the same bank transaction ID"
+                    "Semua kompaun mesti menggunakan "
+                    "ID transaksi bank yang sama / "
+                    "All compounds must use the same "
+                    "bank transaction ID"
                 ),
             )
 
         compound = (
             db.query(Compound)
-            .filter_by(compoundnum=item.compoundnum)
+            .filter_by(
+                compoundnum=item.compoundnum
+            )
             .first()
         )
 
@@ -582,21 +1303,32 @@ def pay_multiple_compounds(
             raise HTTPException(
                 status_code=404,
                 detail=(
-                    f"Kompaun {item.compoundnum} tidak dijumpai / "
-                    f"Compound {item.compoundnum} not found"
+                    f"Kompaun {item.compoundnum} "
+                    "tidak dijumpai / "
+                    f"Compound {item.compoundnum} "
+                    "not found"
                 ),
             )
 
-        # Skip records that are already paid
-        if compound.status == StatusTypeEnum.paid:
+        if (
+            compound.status
+            == StatusTypeEnum.paid
+        ):
             continue
 
-        compound.status = StatusTypeEnum.paid
+        compound.status = (
+            StatusTypeEnum.paid
+        )
+
         db.add(compound)
 
         record = MultiCompound(
-            transaction_bank_id=transaction_id,
-            compoundnum=item.compoundnum,
+            transaction_bank_id=(
+                transaction_id
+            ),
+            compoundnum=(
+                item.compoundnum
+            ),
         )
 
         db.add(record)
@@ -633,7 +1365,11 @@ def get_compounds_by_transaction(
 ):
     results = (
         db.query(MultiCompound)
-        .filter_by(transaction_bank_id=transaction_bank_id)
+        .filter_by(
+            transaction_bank_id=(
+                transaction_bank_id
+            )
+        )
         .all()
     )
 
@@ -658,22 +1394,16 @@ def update_multiple_compounds_to_paid(
     data: dict,
     db: Session = Depends(get_db),
 ):
-    """
-    Example payload:
-
-    {
-        "compound_numbers": [
-            "MBPPCMP20252",
-            "MBPPCMP20253"
-        ]
-    }
-    """
-
-    compound_numbers = data.get("compound_numbers")
+    compound_numbers = data.get(
+        "compound_numbers"
+    )
 
     if (
         not compound_numbers
-        or not isinstance(compound_numbers, list)
+        or not isinstance(
+            compound_numbers,
+            list,
+        )
     ):
         raise HTTPException(
             status_code=400,
@@ -689,38 +1419,61 @@ def update_multiple_compounds_to_paid(
     for compound_number in compound_numbers:
         compound = (
             db.query(Compound)
-            .filter_by(compoundnum=compound_number)
+            .filter_by(
+                compoundnum=(
+                    compound_number
+                )
+            )
             .first()
         )
 
         if not compound:
             skipped.append(
                 {
-                    "compoundnum": compound_number,
-                    "reason": "Tidak dijumpai / Not found",
+                    "compoundnum": (
+                        compound_number
+                    ),
+                    "reason": (
+                        "Tidak dijumpai / "
+                        "Not found"
+                    ),
                 }
             )
             continue
 
-        if compound.status == StatusTypeEnum.paid:
+        if (
+            compound.status
+            == StatusTypeEnum.paid
+        ):
             skipped.append(
                 {
-                    "compoundnum": compound_number,
-                    "reason": "Telah dibayar / Already paid",
+                    "compoundnum": (
+                        compound_number
+                    ),
+                    "reason": (
+                        "Telah dibayar / "
+                        "Already paid"
+                    ),
                 }
             )
             continue
 
-        compound.status = StatusTypeEnum.paid
+        compound.status = (
+            StatusTypeEnum.paid
+        )
 
         db.add(compound)
-        updated.append(compound_number)
+
+        updated.append(
+            compound_number
+        )
 
     db.commit()
 
     return {
         "message": (
-            f"{len(updated)} kompaun dikemas kini kepada DIBAYAR / "
+            f"{len(updated)} kompaun dikemas kini "
+            "kepada DIBAYAR / "
             f"{len(updated)} compounds updated to PAID"
         ),
         "updated_compounds": updated,
@@ -733,28 +1486,19 @@ def update_multiple_compounds_to_paid(
 # =====================================================
 
 @router.post("/receipt/qr/multi")
-def generate_multi_compound_receipt(payload: dict):
-    """
-    Example payload:
+def generate_multi_compound_receipt(
+    payload: dict,
+):
+    compounds = payload.get(
+        "compounds",
+        [],
+    )
 
-    {
-        "compounds": [
-            {
-                "compoundnum": "MBMBCMP2025000123",
-                "amount": 50.0
-            },
-            {
-                "compoundnum": "MBMBCMP2025000456",
-                "amount": 70.0
-            }
-        ],
-        "total_amount": 120.0
-    }
-    """
-
-    compounds = payload.get("compounds", [])
     total_amount = safe_amount(
-        payload.get("total_amount", 0.0)
+        payload.get(
+            "total_amount",
+            0.0,
+        )
     )
 
     if not compounds:
@@ -766,13 +1510,14 @@ def generate_multi_compound_receipt(payload: dict):
             ),
         )
 
-    # Generate bilingual PDF from compound_receipt.py
     pdf_buffer = generate_multi_compound_pdf(
         compounds,
         total_amount,
     )
 
-    pdf_filename = "multi_compound_receipt.pdf"
+    pdf_filename = (
+        "multi_compound_receipt.pdf"
+    )
 
     pdf_url = upload_to_blob(
         pdf_filename,
@@ -780,269 +1525,24 @@ def generate_multi_compound_receipt(payload: dict):
         content_type="application/pdf",
     )
 
-    rows_html = ""
-
-    for compound in compounds:
-        compound_number = safe_html(
-            compound.get("compoundnum")
+    receipt_html = (
+        build_multi_compound_html(
+            compounds=compounds,
+            total_amount=total_amount,
+            pdf_url=pdf_url,
         )
+    )
 
-        amount = safe_amount(
-            compound.get("amount", 0)
-        )
-
-        rows_html += f"""
-            <tr>
-                <td>{compound_number}</td>
-                <td>RM {amount:.2f}</td>
-            </tr>
-        """
-
-    html_content = f"""
-    <!DOCTYPE html>
-    <html lang="ms">
-    <head>
-        <meta charset="utf-8">
-        <meta
-            name="viewport"
-            content="width=device-width, initial-scale=1"
-        >
-        <meta name="color-scheme" content="only light">
-
-        <title>
-            Resit Pelbagai Kompaun /
-            Multiple Compound Receipt
-        </title>
-
-        <style>
-            * {{
-                box-sizing: border-box;
-            }}
-
-            body {{
-                font-family: "Segoe UI", Tahoma, Arial, sans-serif;
-                background: #e8ebef;
-                color: #111827;
-                padding: 25px;
-                margin: 0;
-            }}
-
-            .receipt {{
-                background: #ffffff;
-                padding: 35px;
-                width: 100%;
-                max-width: 800px;
-                border-radius: 16px;
-                box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-                margin: 0 auto;
-                height: auto !important;
-                overflow: visible !important;
-            }}
-
-            .header {{
-                background: #2f80ed;
-                color: #ffffff;
-                padding: 22px 18px;
-                text-align: center;
-                border-radius: 12px;
-            }}
-
-            .header h1 {{
-                margin: 0;
-                font-size: 27px;
-            }}
-
-            .header p {{
-                margin: 8px 0 0;
-                font-size: 15px;
-                opacity: 0.95;
-            }}
-
-            .table-container {{
-                width: 100%;
-                overflow-x: auto;
-                margin-top: 25px;
-                border: 1px solid #e5e7eb;
-                border-radius: 10px;
-            }}
-
-            table {{
-                width: 100%;
-                min-width: 550px;
-                border-collapse: collapse;
-                page-break-inside: auto;
-            }}
-
-            th {{
-                background: #f5f8ff;
-                padding: 13px 12px;
-                border-bottom: 2px solid #d9e2f2;
-                font-size: 16px;
-                font-weight: 700;
-                text-align: center;
-            }}
-
-            th small {{
-                display: block;
-                margin-top: 4px;
-                color: #4b5563;
-                font-size: 12px;
-                font-weight: 500;
-            }}
-
-            td {{
-                padding: 13px 12px;
-                text-align: center;
-                border-bottom: 1px solid #eeeeee;
-                font-size: 16px;
-            }}
-
-            tbody tr:nth-child(even) {{
-                background: #fafafa;
-            }}
-
-            tbody tr:last-child td {{
-                border-bottom: none;
-            }}
-
-            .total {{
-                margin-top: 22px;
-                background: #f4f7ff;
-                padding: 17px;
-                font-size: 20px;
-                font-weight: 700;
-                border-left: 6px solid #2f80ed;
-                border-radius: 10px;
-                text-align: right;
-            }}
-
-            .total span {{
-                color: #1d4ed8;
-                font-size: 24px;
-            }}
-
-            .thankyou {{
-                margin-top: 30px;
-                color: #15803d;
-                text-align: center;
-                font-size: 18px;
-                font-weight: 700;
-                line-height: 1.5;
-            }}
-
-            .pdf-button {{
-                margin-top: 27px;
-                text-align: center;
-            }}
-
-            .pdf-button a {{
-                display: inline-block;
-                background: #27ae60;
-                padding: 13px 22px;
-                color: #ffffff;
-                text-decoration: none;
-                font-size: 17px;
-                border-radius: 10px;
-                font-weight: 600;
-            }}
-
-            .footer {{
-                margin-top: 28px;
-                text-align: center;
-                font-size: 13px;
-                color: #6b7280;
-            }}
-
-            @media (max-width: 600px) {{
-                body {{
-                    padding: 12px;
-                }}
-
-                .receipt {{
-                    padding: 20px 15px;
-                }}
-
-                .header h1 {{
-                    font-size: 22px;
-                }}
-
-                .total {{
-                    text-align: center;
-                }}
-            }}
-        </style>
-    </head>
-
-    <body>
-        <div class="receipt">
-            <div class="header">
-                <h1>
-                    Resit Pelbagai Kompaun /
-                    Multiple Compound Receipt
-                </h1>
-
-                <p>
-                    Rekod Transaksi Rasmi /
-                    Official Transaction Record
-                </p>
-            </div>
-
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>
-                                No. Kompaun
-                                <small>Compound Number</small>
-                            </th>
-
-                            <th>
-                                Jumlah (RM)
-                                <small>Amount (RM)</small>
-                            </th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        {rows_html}
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="total">
-                Jumlah Keseluruhan / Total Amount:
-                <span>RM {total_amount:.2f}</span>
-            </div>
-
-            <div class="thankyou">
-                Terima kasih atas pembayaran anda.<br>
-                Thank you for your payment.
-            </div>
-
-            <div class="pdf-button">
-                <a href="{pdf_url}" target="_blank">
-                    Muat Turun Resit PDF /
-                    Download PDF Receipt
-                </a>
-            </div>
-
-            <div class="footer">
-                &copy; 2025 City Car Park System &bull;
-                Hak Cipta Terpelihara /
-                All Rights Reserved
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-
-    html_bytes = html_content.encode("utf-8")
-    html_filename = "multi_compound_receipt.html"
+    html_filename = (
+        "multi_compound_receipt.html"
+    )
 
     html_url = upload_to_blob(
         html_filename,
-        html_bytes,
+        receipt_html.encode("utf-8"),
         content_type="text/html",
     )
 
-    return generate_qr_response(html_url)
+    return generate_qr_response(
+        html_url
+    )

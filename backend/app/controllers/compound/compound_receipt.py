@@ -1,11 +1,13 @@
-from fpdf import FPDF
-from app.utils.blob_upload import upload_to_blob
 from io import BytesIO
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib.utils import ImageReader
-from reportlab.lib import colors
 import os
+
+from fpdf import FPDF
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas
+
+from app.utils.blob_upload import upload_to_blob
 
 
 # =====================================================
@@ -13,82 +15,47 @@ import os
 # =====================================================
 
 LOGO_PATH = "app/resources/images/City_Car_Park_logo.png"
-
 LOGO_RL = None
 
 if os.path.exists(LOGO_PATH):
     try:
         with open(LOGO_PATH, "rb") as logo_file:
-            LOGO_RL = ImageReader(BytesIO(logo_file.read()))
+            LOGO_RL = ImageReader(
+                BytesIO(logo_file.read())
+            )
 
-        print("[INFO] Logo loaded for ReportLab multiple compound PDF")
+        print(
+            "[INFO] Logo loaded for "
+            "ReportLab compound PDF"
+        )
 
     except Exception as error:
-        print(f"[WARN] Failed to load ReportLab logo: {error}")
+        print(
+            "[WARN] Failed to load "
+            f"ReportLab logo: {error}"
+        )
 
 else:
-    print(f"[WARN] Logo path does not exist: {LOGO_PATH}")
+    print(
+        "[WARN] Logo path does not exist: "
+        f"{LOGO_PATH}"
+    )
 
 
 # =====================================================
-# BILINGUAL LABELS
-# BAHASA MELAYU / ENGLISH
-# =====================================================
-
-LABELS = {
-    "single_title": "E-RESIT KOMPAUN / COMPOUND E-RECEIPT",
-    "single_details": "Butiran Resit / Receipt Details",
-
-    "name": "Nama / Name",
-    "compound_no": "No. Kompaun / Compound No.",
-    "plate_no": "No. Plat / Plate No.",
-    "date": "Tarikh / Date",
-    "time": "Masa / Time",
-    "offense": "Kesalahan / Offense",
-    "amount": "Jumlah / Amount",
-
-    "multi_title": "RESIT PELBAGAI KOMPAUN / MULTIPLE COMPOUND RECEIPT",
-    "subtitle": "Rekod Transaksi Rasmi / Official Transaction Record",
-
-    "column_compound_no_ms": "No. Kompaun",
-    "column_compound_no_en": "Compound Number",
-
-    "column_amount_ms": "Jumlah (RM)",
-    "column_amount_en": "Amount (RM)",
-
-    "total": "JUMLAH KESELURUHAN / TOTAL AMOUNT:",
-
-    "thank_you_ms": "Terima kasih atas pembayaran anda!",
-    "thank_you_en": "Thank you for your payment!",
-
-    "footer": (
-        "2025 City Car Park System . "
-        "Hak Cipta Terpelihara / All Rights Reserved"
-    ),
-}
-
-
-# =====================================================
-# SAFE TEXT HELPERS
+# HELPERS
 # =====================================================
 
 def safe_text(value, fallback="-"):
-    """
-    Convert a value into display-safe text.
-    """
-
     if value is None:
         return fallback
 
-    value = str(value).strip()
-    return value if value else fallback
+    text = str(value).strip()
+
+    return text if text else fallback
 
 
 def safe_date(value):
-    """
-    Format a date value safely.
-    """
-
     if value is None:
         return "-"
 
@@ -99,10 +66,6 @@ def safe_date(value):
 
 
 def safe_time(value):
-    """
-    Format a time value safely.
-    """
-
     if value is None:
         return "-"
 
@@ -113,14 +76,211 @@ def safe_time(value):
 
 
 def safe_amount(value):
-    """
-    Convert an amount into a two-decimal float safely.
-    """
-
     try:
         return float(value or 0)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _draw_image_keep_ratio(
+    pdf,
+    image,
+    x,
+    y,
+    max_width,
+    max_height,
+):
+    try:
+        image_width, image_height = image.getSize()
+
+        ratio = min(
+            max_width / image_width,
+            max_height / image_height,
+        )
+
+        draw_width = image_width * ratio
+        draw_height = image_height * ratio
+
+        pdf.drawImage(
+            image,
+            x + (max_width - draw_width) / 2,
+            y + (max_height - draw_height) / 2,
+            width=draw_width,
+            height=draw_height,
+            preserveAspectRatio=True,
+            mask="auto",
+        )
+
+    except Exception as error:
+        print(
+            "[WARN] Failed to draw logo: "
+            f"{error}"
+        )
+
+
+def _draw_bilingual_left(
+    pdf,
+    malay,
+    english,
+    x,
+    y,
+    malay_size=9,
+    english_size=8,
+    malay_color=colors.black,
+    english_color=colors.HexColor("#6B7280"),
+    line_gap=11,
+):
+    pdf.setFillColor(malay_color)
+    pdf.setFont(
+        "Helvetica-Bold",
+        malay_size,
+    )
+    pdf.drawString(
+        x,
+        y,
+        str(malay),
+    )
+
+    pdf.setFillColor(english_color)
+    pdf.setFont(
+        "Helvetica-Oblique",
+        english_size,
+    )
+    pdf.drawString(
+        x,
+        y - line_gap,
+        str(english),
+    )
+
+
+def _draw_bilingual_right(
+    pdf,
+    malay,
+    english,
+    x,
+    y,
+    malay_size=9,
+    english_size=8,
+    malay_color=colors.black,
+    english_color=colors.HexColor("#6B7280"),
+    line_gap=11,
+):
+    pdf.setFillColor(malay_color)
+    pdf.setFont(
+        "Helvetica-Bold",
+        malay_size,
+    )
+    pdf.drawRightString(
+        x,
+        y,
+        str(malay),
+    )
+
+    pdf.setFillColor(english_color)
+    pdf.setFont(
+        "Helvetica-Oblique",
+        english_size,
+    )
+    pdf.drawRightString(
+        x,
+        y - line_gap,
+        str(english),
+    )
+
+
+def _draw_bilingual_center(
+    pdf,
+    malay,
+    english,
+    x,
+    y,
+    malay_size=9,
+    english_size=8,
+    malay_color=colors.black,
+    english_color=colors.HexColor("#6B7280"),
+    line_gap=11,
+):
+    pdf.setFillColor(malay_color)
+    pdf.setFont(
+        "Helvetica-Bold",
+        malay_size,
+    )
+    pdf.drawCentredString(
+        x,
+        y,
+        str(malay),
+    )
+
+    pdf.setFillColor(english_color)
+    pdf.setFont(
+        "Helvetica-Oblique",
+        english_size,
+    )
+    pdf.drawCentredString(
+        x,
+        y - line_gap,
+        str(english),
+    )
+
+
+# =====================================================
+# BILINGUAL LABELS
+# MALAY BOLD / ENGLISH ITALIC
+# =====================================================
+
+LABELS = {
+    "single_title_ms": "E-RESIT KOMPAUN",
+    "single_title_en": "COMPOUND E-RECEIPT",
+
+    "single_details_ms": "Butiran Resit",
+    "single_details_en": "Receipt Details",
+
+    "name_ms": "Nama",
+    "name_en": "Name",
+
+    "compound_no_ms": "No. Kompaun",
+    "compound_no_en": "Compound No.",
+
+    "plate_no_ms": "No. Plat",
+    "plate_no_en": "Plate No.",
+
+    "date_ms": "Tarikh",
+    "date_en": "Date",
+
+    "time_ms": "Masa",
+    "time_en": "Time",
+
+    "offense_ms": "Kesalahan",
+    "offense_en": "Offense",
+
+    "amount_ms": "Jumlah Dibayar",
+    "amount_en": "Total Paid",
+
+    "multi_title_ms": "RESIT PELBAGAI KOMPAUN",
+    "multi_title_en": "MULTIPLE COMPOUND RECEIPT",
+
+    "subtitle_ms": "Rekod Transaksi Rasmi",
+    "subtitle_en": "Official Transaction Record",
+
+    "column_compound_no_ms": "No. Kompaun",
+    "column_compound_no_en": "Compound Number",
+
+    "column_amount_ms": "Jumlah (RM)",
+    "column_amount_en": "Amount (RM)",
+
+    "total_ms": "Jumlah Keseluruhan",
+    "total_en": "Total Amount",
+
+    "thank_you_ms": "Terima kasih atas pembayaran anda!",
+    "thank_you_en": "Thank you for your payment!",
+
+    "footer_ms": (
+        "2026 Juara Inovasi Pintar System "
+        "· Hak Cipta Terpelihara"
+    ),
+
+    "footer_en": "All Rights Reserved",
+}
 
 
 # =====================================================
@@ -130,7 +290,7 @@ def safe_amount(value):
 
 def generate_single_compound_pdf(compound):
     """
-    Generate and upload a bilingual single-compound PDF receipt.
+    Generate and upload a polished bilingual single-compound PDF.
 
     Returns:
         str: Uploaded PDF Blob URL.
@@ -147,186 +307,290 @@ def generate_single_compound_pdf(compound):
     pdf = FPDF()
     pdf.add_page()
 
-    # ================= LOGO =================
+    # =================================================
+    # COLORS
+    # =================================================
 
-    logo_bottom = 20
+    primary_blue = (0, 59, 142)
+    secondary_blue = (10, 102, 216)
+    soft_blue = (234, 243, 255)
+    card_blue = (248, 251, 255)
+    grey = (107, 114, 128)
+    dark = (17, 24, 39)
+    green = (21, 128, 61)
+
+    # =================================================
+    # HEADER
+    # =================================================
+
+    pdf.set_fill_color(*primary_blue)
+    pdf.rect(
+        0,
+        0,
+        210,
+        62,
+        style="F",
+    )
+
+    pdf.set_fill_color(*secondary_blue)
+    pdf.rect(
+        0,
+        0,
+        210,
+        10,
+        style="F",
+    )
 
     if os.path.exists(LOGO_PATH):
         try:
-            logo_x = 70
-            logo_y = 10
-            logo_width = 70
-
             pdf.image(
                 LOGO_PATH,
-                x=logo_x,
-                y=logo_y,
-                w=logo_width,
+                x=15,
+                y=15,
+                w=38,
+            )
+        except Exception as error:
+            print(
+                "[WARN] Failed to draw FPDF logo: "
+                f"{error}"
             )
 
-            logo_bottom = 60
+    pdf.set_text_color(255, 255, 255)
 
-        except Exception as error:
-            print(f"[WARN] Failed to draw FPDF logo: {error}")
-
-    # ================= TITLE =================
-
-    title_y = logo_bottom + 10
-
-    pdf.set_xy(10, title_y)
-    pdf.set_font("Arial", "B", 17)
-    pdf.set_text_color(30, 58, 138)
+    pdf.set_xy(10, 18)
+    pdf.set_font("Arial", "B", 18)
 
     pdf.cell(
         190,
-        12,
-        LABELS["single_title"],
+        9,
+        LABELS["single_title_ms"],
         align="C",
     )
 
-    # Divider line
-    pdf.set_draw_color(200, 200, 200)
-
-    pdf.line(
-        20,
-        title_y + 16,
-        190,
-        title_y + 16,
-    )
-
-    # ================= DETAILS BOX =================
-
-    box_x = 15
-    box_y = title_y + 24
-    box_w = 180
-    box_h = 122
-    padding = 8
-    inner_w = box_w - (padding * 2)
-
-    pdf.set_fill_color(245, 247, 255)
-
-    pdf.rect(
-        box_x,
-        box_y,
-        box_w,
-        box_h,
-        style="F",
-    )
-
-    # Details heading
-    y = box_y + padding
-
-    pdf.set_xy(box_x + padding, y)
-    pdf.set_font("Arial", "B", 13)
-    pdf.set_text_color(0, 0, 0)
+    pdf.set_xy(10, 28)
+    pdf.set_font("Arial", "I", 10)
 
     pdf.cell(
-        inner_w,
-        8,
-        LABELS["single_details"],
-        ln=True,
+        190,
+        7,
+        LABELS["single_title_en"],
+        align="C",
     )
 
-    y += 13
+    pdf.set_xy(10, 42)
+    pdf.set_font("Arial", "B", 9)
 
-    # Detail rows
-    detail_rows = [
-        (LABELS["name"], compound_name),
-        (LABELS["compound_no"], compound_no),
-        (LABELS["plate_no"], compound_plate),
-        (LABELS["date"], compound_date),
-        (LABELS["time"], compound_time),
+    pdf.cell(
+        190,
+        6,
+        LABELS["single_details_ms"],
+        align="C",
+    )
+
+    pdf.set_xy(10, 49)
+    pdf.set_font("Arial", "I", 8)
+
+    pdf.cell(
+        190,
+        5,
+        LABELS["single_details_en"],
+        align="C",
+    )
+
+    # =================================================
+    # DETAILS CARDS
+    # =================================================
+
+    pdf.set_text_color(*dark)
+
+    card_x = 15
+    card_w = 180
+    card_h = 22
+    y = 72
+
+    details = [
+        (
+            LABELS["name_ms"],
+            LABELS["name_en"],
+            compound_name,
+        ),
+        (
+            LABELS["compound_no_ms"],
+            LABELS["compound_no_en"],
+            compound_no,
+        ),
+        (
+            LABELS["plate_no_ms"],
+            LABELS["plate_no_en"],
+            compound_plate,
+        ),
+        (
+            LABELS["date_ms"],
+            LABELS["date_en"],
+            compound_date,
+        ),
+        (
+            LABELS["time_ms"],
+            LABELS["time_en"],
+            compound_time,
+        ),
     ]
 
-    pdf.set_font("Arial", "", 11)
+    for index, (malay, english, value) in enumerate(details):
+        if index % 2 == 0:
+            pdf.set_fill_color(*card_blue)
+        else:
+            pdf.set_fill_color(255, 255, 255)
 
-    label_width = 62
-    value_width = inner_w - label_width
+        pdf.set_draw_color(220, 232, 248)
 
-    for label, value in detail_rows:
-        pdf.set_xy(box_x + padding, y)
-        pdf.set_font("Arial", "B", 10.5)
-
-        pdf.cell(
-            label_width,
-            7,
-            f"{label}:",
+        pdf.rounded_rect(
+            card_x,
+            y,
+            card_w,
+            card_h,
+            3,
+            style="DF",
         )
 
-        pdf.set_font("Arial", "", 10.5)
+        pdf.set_xy(card_x + 6, y + 4)
+        pdf.set_font("Arial", "B", 9)
+        pdf.set_text_color(*primary_blue)
 
         pdf.cell(
-            value_width,
+            58,
+            5,
+            malay,
+        )
+
+        pdf.set_xy(card_x + 6, y + 10)
+        pdf.set_font("Arial", "I", 7)
+        pdf.set_text_color(*grey)
+
+        pdf.cell(
+            58,
+            5,
+            english,
+        )
+
+        pdf.set_xy(card_x + 68, y + 7)
+        pdf.set_font("Arial", "B", 10)
+        pdf.set_text_color(*dark)
+
+        pdf.cell(
+            105,
             7,
             value,
-            ln=True,
         )
 
-        y += 9
+        y += card_h + 3
 
-    # ================= OFFENSE =================
+    # =================================================
+    # OFFENSE CARD
+    # =================================================
 
-    pdf.set_xy(box_x + padding, y)
-    pdf.set_font("Arial", "B", 10.5)
+    offense_h = 42
+
+    pdf.set_fill_color(*card_blue)
+    pdf.set_draw_color(220, 232, 248)
+
+    pdf.rounded_rect(
+        card_x,
+        y,
+        card_w,
+        offense_h,
+        3,
+        style="DF",
+    )
+
+    pdf.set_xy(card_x + 6, y + 5)
+    pdf.set_font("Arial", "B", 9)
+    pdf.set_text_color(*primary_blue)
 
     pdf.cell(
-        label_width,
-        7,
-        f"{LABELS['offense']}:",
+        60,
+        5,
+        LABELS["offense_ms"],
     )
 
-    pdf.set_xy(
-        box_x + padding + label_width,
-        y,
+    pdf.set_xy(card_x + 6, y + 11)
+    pdf.set_font("Arial", "I", 7)
+    pdf.set_text_color(*grey)
+
+    pdf.cell(
+        60,
+        5,
+        LABELS["offense_en"],
     )
 
-    pdf.set_font("Arial", "", 10.5)
+    pdf.set_xy(card_x + 68, y + 6)
+    pdf.set_font("Arial", "", 9)
+    pdf.set_text_color(*dark)
 
     pdf.multi_cell(
-        value_width,
-        6,
+        105,
+        5,
         compound_offense,
     )
 
-    # ================= AMOUNT BOX =================
+    y += offense_h + 8
 
-    amount_y = box_y + box_h + 10
-    amount_h = 18
+    # =================================================
+    # TOTAL CARD
+    # =================================================
 
-    pdf.set_fill_color(230, 240, 255)
+    pdf.set_fill_color(*soft_blue)
+    pdf.set_draw_color(191, 215, 255)
 
-    pdf.rect(
-        box_x,
-        amount_y,
-        box_w,
-        amount_h,
-        style="F",
+    pdf.rounded_rect(
+        card_x,
+        y,
+        card_w,
+        28,
+        4,
+        style="DF",
     )
 
-    pdf.set_xy(
-        box_x,
-        amount_y + 3,
-    )
-
-    pdf.set_font("Arial", "B", 15)
-    pdf.set_text_color(0, 80, 180)
+    pdf.set_xy(card_x + 8, y + 5)
+    pdf.set_font("Arial", "B", 11)
+    pdf.set_text_color(*primary_blue)
 
     pdf.cell(
-        box_w,
-        10,
-        f"{LABELS['amount']}: RM {compound_amount:.2f}",
-        align="C",
+        90,
+        6,
+        LABELS["amount_ms"],
     )
 
-    # ================= THANK YOU =================
+    pdf.set_xy(card_x + 8, y + 12)
+    pdf.set_font("Arial", "I", 8)
+    pdf.set_text_color(*grey)
 
-    pdf.set_text_color(0, 128, 60)
+    pdf.cell(
+        90,
+        5,
+        LABELS["amount_en"],
+    )
+
+    pdf.set_xy(card_x + 105, y + 8)
+    pdf.set_font("Arial", "B", 17)
+    pdf.set_text_color(*secondary_blue)
+
+    pdf.cell(
+        62,
+        10,
+        f"RM {compound_amount:,.2f}",
+        align="R",
+    )
+
+    # =================================================
+    # THANK YOU
+    # =================================================
+
+    y += 40
+
+    pdf.set_text_color(*green)
+    pdf.set_xy(10, y)
     pdf.set_font("Arial", "B", 11)
-
-    pdf.set_xy(
-        10,
-        amount_y + amount_h + 8,
-    )
 
     pdf.cell(
         190,
@@ -335,43 +599,62 @@ def generate_single_compound_pdf(compound):
         align="C",
     )
 
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Arial", "I", 10)
-
-    pdf.set_xy(
-        10,
-        amount_y + amount_h + 15,
-    )
+    pdf.set_xy(10, y + 8)
+    pdf.set_font("Arial", "I", 9)
 
     pdf.cell(
         190,
-        7,
+        6,
         LABELS["thank_you_en"],
         align="C",
     )
 
-    # ================= FOOTER =================
+    # =================================================
+    # FOOTER
+    # =================================================
 
-    pdf.set_xy(
-        10,
-        amount_y + amount_h + 28,
+    pdf.set_draw_color(220, 232, 248)
+    pdf.line(
+        20,
+        276,
+        190,
+        276,
     )
 
-    pdf.set_font("Arial", "I", 9)
-    pdf.set_text_color(140, 140, 140)
+    pdf.set_text_color(*primary_blue)
+    pdf.set_xy(10, 279)
+    pdf.set_font("Arial", "B", 8)
 
     pdf.cell(
         190,
-        8,
-        LABELS["footer"],
+        5,
+        LABELS["footer_ms"],
         align="C",
     )
 
-    # ================= OUTPUT =================
+    pdf.set_text_color(*grey)
+    pdf.set_xy(10, 285)
+    pdf.set_font("Arial", "I", 7)
 
-    pdf_bytes = pdf.output(dest="S").encode("latin1")
+    pdf.cell(
+        190,
+        5,
+        LABELS["footer_en"],
+        align="C",
+    )
 
-    filename = f"compound_{compound_no}.pdf"
+    # =================================================
+    # OUTPUT
+    # =================================================
+
+    pdf_bytes = (
+        pdf.output(dest="S")
+        .encode("latin1")
+    )
+
+    filename = (
+        f"compound_{compound_no}.pdf"
+    )
 
     return upload_to_blob(
         filename,
@@ -381,216 +664,201 @@ def generate_single_compound_pdf(compound):
 
 
 # =====================================================
-# REPORTLAB MULTI-PAGE HELPERS
+# MULTIPLE COMPOUND PDF HELPERS
 # =====================================================
 
-def draw_multi_compound_header(pdf, width, height):
-    """
-    Draw the logo and bilingual title.
+def draw_multi_compound_header(
+    pdf,
+    width,
+    height,
+):
+    primary_blue = colors.HexColor("#003B8E")
+    secondary_blue = colors.HexColor("#0A66D8")
 
-    Returns:
-        float: Starting Y position for the table.
-    """
+    header_height = 165
 
-    top_y = height - 70
+    pdf.setFillColor(primary_blue)
+
+    pdf.rect(
+        0,
+        height - header_height,
+        width,
+        header_height,
+        fill=True,
+        stroke=False,
+    )
+
+    pdf.setFillColor(secondary_blue)
+
+    pdf.rect(
+        0,
+        height - 42,
+        width,
+        42,
+        fill=True,
+        stroke=False,
+    )
+
+    pdf.setFillColor(
+        colors.Color(
+            1,
+            1,
+            1,
+            alpha=0.08,
+        )
+    )
+
+    pdf.circle(
+        width - 45,
+        height - 50,
+        95,
+        fill=True,
+        stroke=False,
+    )
+
+    pdf.circle(
+        40,
+        height - 145,
+        55,
+        fill=True,
+        stroke=False,
+    )
 
     if LOGO_RL:
-        image_width, image_height = LOGO_RL.getSize()
-
-        logo_width = 105
-        logo_height = (
-            image_height / image_width
-        ) * logo_width
-
-        logo_x = (
-            width - logo_width
-        ) / 2
-
-        logo_y = top_y - logo_height
-
-        pdf.drawImage(
+        _draw_image_keep_ratio(
+            pdf,
             LOGO_RL,
-            logo_x,
-            logo_y,
-            width=logo_width,
-            height=logo_height,
-            preserveAspectRatio=True,
-            mask="auto",
+            40,
+            height - 135,
+            100,
+            90,
         )
 
-        top_y = logo_y - 32
-
-    pdf.setFillColor(
-        colors.HexColor("#1E3A8A")
-    )
-
-    pdf.setFont(
-        "Helvetica-Bold",
-        17,
-    )
-
-    pdf.drawCentredString(
+    _draw_bilingual_center(
+        pdf,
+        LABELS["multi_title_ms"],
+        LABELS["multi_title_en"],
         width / 2,
-        top_y,
-        LABELS["multi_title"],
+        height - 62,
+        malay_size=19,
+        english_size=10,
+        malay_color=colors.white,
+        english_color=colors.white,
+        line_gap=15,
     )
 
-    pdf.setFont(
-        "Helvetica",
-        11,
-    )
-
-    pdf.setFillColor(
-        colors.HexColor("#6B7280")
-    )
-
-    pdf.drawCentredString(
+    _draw_bilingual_center(
+        pdf,
+        LABELS["subtitle_ms"],
+        LABELS["subtitle_en"],
         width / 2,
-        top_y - 19,
-        LABELS["subtitle"],
+        height - 108,
+        malay_size=9,
+        english_size=8,
+        malay_color=colors.white,
+        english_color=colors.white,
+        line_gap=11,
     )
 
-    divider_y = top_y - 34
-
-    pdf.setStrokeColor(
-        colors.HexColor("#D1D5DB")
-    )
-
-    pdf.line(
-        40,
-        divider_y,
-        width - 40,
-        divider_y,
-    )
-
-    return divider_y - 32
+    return height - header_height - 28
 
 
-def draw_multi_compound_table_header(pdf, y):
-    """
-    Draw the bilingual table header.
-
-    Returns:
-        float: Y position for the first data row.
-    """
-
+def draw_multi_compound_table_header(
+    pdf,
+    y,
+):
     table_x = 40
     table_width = 520
-    header_height = 40
+    header_height = 44
 
-    pdf.setFillColor(
-        colors.HexColor("#E9F0FF")
-    )
+    secondary_blue = colors.HexColor("#0A66D8")
 
-    pdf.setStrokeColor(
-        colors.HexColor("#BFDBFE")
-    )
+    pdf.setFillColor(secondary_blue)
 
     pdf.roundRect(
         table_x,
         y - header_height,
         table_width,
         header_height,
-        radius=5,
+        10,
         fill=True,
-        stroke=True,
+        stroke=False,
     )
 
-    pdf.setFillColor(colors.black)
-
-    # Bahasa Melayu
-    pdf.setFont(
-        "Helvetica-Bold",
-        9,
-    )
-
-    pdf.drawString(
-        50,
-        y - 15,
+    _draw_bilingual_left(
+        pdf,
         LABELS["column_compound_no_ms"],
-    )
-
-    pdf.drawRightString(
-        545,
-        y - 15,
-        LABELS["column_amount_ms"],
-    )
-
-    # English
-    pdf.setFont(
-        "Helvetica",
-        8.5,
-    )
-
-    pdf.drawString(
-        50,
-        y - 29,
         LABELS["column_compound_no_en"],
+        54,
+        y - 15,
+        malay_size=8.5,
+        english_size=7.5,
+        malay_color=colors.white,
+        english_color=colors.white,
+        line_gap=11,
     )
 
-    pdf.drawRightString(
-        545,
-        y - 29,
+    _draw_bilingual_right(
+        pdf,
+        LABELS["column_amount_ms"],
         LABELS["column_amount_en"],
+        546,
+        y - 15,
+        malay_size=8.5,
+        english_size=7.5,
+        malay_color=colors.white,
+        english_color=colors.white,
+        line_gap=11,
     )
 
-    return y - header_height - 5
+    return y - header_height - 6
 
 
-def draw_multi_compound_footer(pdf, width):
-    """
-    Draw the bilingual page footer.
-    """
+def draw_multi_compound_footer(
+    pdf,
+    width,
+):
+    primary_blue = colors.HexColor("#003B8E")
+    grey_text = colors.HexColor("#6B7280")
 
     pdf.setStrokeColor(
-        colors.HexColor("#E5E7EB")
+        colors.HexColor("#DCE8F8")
     )
 
     pdf.line(
         40,
-        48,
+        55,
         width - 40,
-        48,
+        55,
     )
 
-    pdf.setFont(
-        "Helvetica",
-        8.5,
-    )
-
-    pdf.setFillColor(
-        colors.HexColor("#6B7280")
-    )
-
-    pdf.drawCentredString(
+    _draw_bilingual_center(
+        pdf,
+        LABELS["footer_ms"],
+        LABELS["footer_en"],
         width / 2,
-        30,
-        LABELS["footer"],
+        39,
+        malay_size=7.5,
+        english_size=6.5,
+        malay_color=primary_blue,
+        english_color=grey_text,
+        line_gap=9,
     )
 
 
 # =====================================================
 # MULTIPLE COMPOUND RECEIPT PDF
-# REPORTLAB
 # =====================================================
 
-def generate_multi_compound_pdf(compounds, total_amount):
+def generate_multi_compound_pdf(
+    compounds,
+    total_amount,
+):
     """
-    Generate a bilingual multiple-compound PDF receipt.
+    Generate a polished bilingual multiple-compound PDF.
 
-    Args:
-        compounds:
-            List of compound dictionaries.
-
-            Expected keys:
-                compoundnum
-                amount
-
-        total_amount:
-            Total paid amount.
-
-    Returns:
-        BytesIO: PDF buffer.
+    Bahasa Melayu is bold.
+    English is italic underneath.
     """
 
     buffer = BytesIO()
@@ -602,9 +870,22 @@ def generate_multi_compound_pdf(compounds, total_amount):
 
     width, height = A4
 
-    safe_total = safe_amount(total_amount)
+    primary_blue = colors.HexColor("#003B8E")
+    secondary_blue = colors.HexColor("#0A66D8")
+    soft_blue = colors.HexColor("#F4F8FF")
+    row_blue = colors.HexColor("#EDF4FF")
+    border_color = colors.HexColor("#DCE8F8")
+    grey_text = colors.HexColor("#6B7280")
+    dark_text = colors.HexColor("#111827")
+    success_green = colors.HexColor("#15803D")
 
-    # First page header
+    row_height = 34
+    footer_safe_y = 95
+
+    safe_total = safe_amount(
+        total_amount
+    )
+
     y = draw_multi_compound_header(
         pdf,
         width,
@@ -616,13 +897,15 @@ def generate_multi_compound_pdf(compounds, total_amount):
         y,
     )
 
-    row_height = 27
+    # =================================================
+    # TABLE ROWS
+    # =================================================
 
-    # ================= TABLE ROWS =================
-
-    for index, compound in enumerate(compounds):
-
-        if y <= 105:
+    for index, compound in enumerate(
+        compounds,
+        start=1,
+    ):
+        if y - row_height < footer_safe_y:
             draw_multi_compound_footer(
                 pdf,
                 width,
@@ -650,7 +933,7 @@ def generate_multi_compound_pdf(compounds, total_amount):
         )
 
         row_background = (
-            colors.HexColor("#F9FAFB")
+            row_blue
             if index % 2 == 0
             else colors.white
         )
@@ -660,44 +943,64 @@ def generate_multi_compound_pdf(compounds, total_amount):
         )
 
         pdf.setStrokeColor(
-            colors.HexColor("#E5E7EB")
+            border_color
         )
 
-        pdf.rect(
+        pdf.roundRect(
             40,
             y - row_height,
             520,
             row_height,
+            7,
             fill=True,
             stroke=True,
         )
 
         pdf.setFillColor(
-            colors.HexColor("#111827")
+            dark_text
         )
 
         pdf.setFont(
-            "Helvetica",
+            "Helvetica-Bold",
             10,
         )
 
         pdf.drawString(
-            50,
-            y - 18,
+            54,
+            y - 22,
             compound_number,
         )
 
-        pdf.drawRightString(
-            545,
-            y - 18,
-            f"{amount:.2f}",
+        pdf.setFillColor(
+            primary_blue
         )
 
-        y -= row_height
+        pdf.setFont(
+            "Helvetica-Bold",
+            10,
+        )
 
-    # ================= TOTAL =================
+        pdf.drawRightString(
+            546,
+            y - 22,
+            f"{amount:,.2f}",
+        )
 
-    if y <= 120:
+        y -= row_height + 5
+
+    # =================================================
+    # TOTAL
+    # =================================================
+
+    total_height = 58
+    thank_you_space = 65
+
+    if (
+        y
+        - total_height
+        - thank_you_space
+        < footer_safe_y
+    ):
         draw_multi_compound_footer(
             pdf,
             width,
@@ -711,87 +1014,76 @@ def generate_multi_compound_pdf(compounds, total_amount):
             height,
         )
 
-    total_box_height = 40
+    y -= 16
 
     pdf.setFillColor(
-        colors.HexColor("#D6E9FF")
+        soft_blue
     )
 
     pdf.setStrokeColor(
-        colors.HexColor("#93C5FD")
+        colors.HexColor("#BFD7FF")
     )
 
     pdf.roundRect(
         40,
-        y - total_box_height - 10,
+        y - total_height,
         520,
-        total_box_height,
-        radius=6,
+        total_height,
+        12,
         fill=True,
         stroke=True,
     )
 
+    _draw_bilingual_left(
+        pdf,
+        LABELS["total_ms"],
+        LABELS["total_en"],
+        58,
+        y - 22,
+        malay_size=12,
+        english_size=8.5,
+        malay_color=primary_blue,
+        english_color=grey_text,
+        line_gap=12,
+    )
+
     pdf.setFillColor(
-        colors.HexColor("#111827")
+        secondary_blue
     )
 
     pdf.setFont(
         "Helvetica-Bold",
-        11,
-    )
-
-    pdf.drawString(
-        50,
-        y - 36,
-        LABELS["total"],
-    )
-
-    pdf.setFillColor(
-        colors.HexColor("#1D4ED8")
-    )
-
-    pdf.setFont(
-        "Helvetica-Bold",
-        14,
+        20,
     )
 
     pdf.drawRightString(
-        545,
-        y - 36,
-        f"RM {safe_total:.2f}",
+        542,
+        y - 35,
+        f"RM {safe_total:,.2f}",
     )
 
-    # ================= THANK YOU =================
+    y -= total_height + 30
 
-    thank_you_y = y - 92
+    # =================================================
+    # THANK YOU
+    # =================================================
 
-    pdf.setFillColor(
-        colors.HexColor("#15803D")
-    )
-
-    pdf.setFont(
-        "Helvetica-Bold",
-        11,
-    )
-
-    pdf.drawCentredString(
-        width / 2,
-        thank_you_y,
+    _draw_bilingual_center(
+        pdf,
         LABELS["thank_you_ms"],
-    )
-
-    pdf.setFont(
-        "Helvetica",
-        10,
-    )
-
-    pdf.drawCentredString(
-        width / 2,
-        thank_you_y - 16,
         LABELS["thank_you_en"],
+        width / 2,
+        y,
+        malay_size=11,
+        english_size=8.5,
+        malay_color=success_green,
+        english_color=success_green,
+        line_gap=12,
     )
 
-    # ================= FOOTER =================
+    # =================================================
+    # FOOTER
+    # =================================================
 
     draw_multi_compound_footer(
         pdf,
