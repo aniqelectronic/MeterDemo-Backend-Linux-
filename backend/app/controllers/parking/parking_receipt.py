@@ -298,7 +298,7 @@ L = {
     "safe_ms": "Pandu dengan selamat!",
     "safe_en": "Drive safely!",
 
-    "company_ms": "Juara Inovasi Pintar System",
+    "company_ms": "Juara Inovasi Pasifik System",
     "company_en": "All Rights Reserved",
 }
 
@@ -712,7 +712,7 @@ def generate_parking_receipt(
     c.drawCentredString(
         width / 2,
         28,
-        "© 2026 Juara Inovasi Pintar System",
+        "© 2026 Juara Inovasi Pasifik System",
     )
 
     # =====================================================

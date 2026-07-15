@@ -370,7 +370,7 @@ def _draw_page_background(canvas_obj, document):
     canvas_obj.drawCentredString(
         page_width / 2,
         12.5 * mm,
-        "2026 Juara Inovasi Pintar System - Hak Cipta Terpelihara",
+        "2026 Juara Inovasi Pasifik System - Hak Cipta Terpelihara",
     )
 
     canvas_obj.setFillColor(grey_text)
@@ -439,7 +439,7 @@ def generate_multi_tax_pdf(Taxes, total_amount):
             "Resit Pelbagai Cukai / "
             "Multiple Tax Receipt"
         ),
-        author="Juara Inovasi Pintar System",
+        author="Juara Inovasi Pasifik System",
     )
 
     story = []

@@ -586,7 +586,7 @@ def build_single_compound_html(
 
                 <div class="footer">
                     <div class="ms">
-                        © 2026 Juara Inovasi Pintar System
+                        © 2026 Juara Inovasi Pasifik System
                         · Hak Cipta Terpelihara
                     </div>
 
@@ -1053,7 +1053,7 @@ def build_multi_compound_html(
 
                 <div class="footer">
                     <div class="ms">
-                        © 2026 Juara Inovasi Pintar System
+                        © 2026 Juara Inovasi Pasifik System
                         · Hak Cipta Terpelihara
                     </div>
 

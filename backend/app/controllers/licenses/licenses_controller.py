@@ -597,7 +597,7 @@ def _build_single_license_html(
 
                 <div class="footer">
                     <div class="ms">
-                        © 2026 Juara Inovasi Pintar System
+                        © 2026 Juara Inovasi Pasifik System
                         · Hak Cipta Terpelihara
                     </div>
 
@@ -1088,7 +1088,7 @@ def _build_multi_license_html(
 
                 <div class="footer">
                     <div class="ms">
-                        © 2026 Juara Inovasi Pintar System
+                        © 2026 Juara Inovasi Pasifik System
                         · Hak Cipta Terpelihara
                     </div>
 

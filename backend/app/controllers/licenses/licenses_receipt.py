@@ -252,7 +252,7 @@ L = {
     ),
 
     "footer_ms": (
-        "2026 Juara Inovasi Pintar System "
+        "2026 Juara Inovasi Pasifik System "
         "· Hak Cipta Terpelihara"
     ),
 

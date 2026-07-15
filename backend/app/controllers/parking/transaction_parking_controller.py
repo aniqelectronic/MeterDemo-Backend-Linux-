@@ -451,12 +451,12 @@ def _generate_parking_receipt_html(
                     <div class="issued-by">
                         <div class="ms">
                             Dikeluarkan oleh
-                            Juara Inovasi Pintar
+                            Juara Inovasi Pasifik
                         </div>
 
                         <div class="en">
                             Issued by
-                            Juara Inovasi Pintar
+                            Juara Inovasi Pasifik
                         </div>
                     </div>
                 </div>
@@ -638,7 +638,7 @@ def _generate_parking_receipt_html(
 
                 <div class="footer">
                     <div class="ms">
-                        © 2026 Juara Inovasi Pintar System
+                        © 2026 Juara Inovasi Pasifik System
                         · Hak Cipta Terpelihara
                     </div>
 

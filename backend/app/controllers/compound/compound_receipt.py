@@ -275,7 +275,7 @@ LABELS = {
     "thank_you_en": "Thank you for your payment!",
 
     "footer_ms": (
-        "2026 Juara Inovasi Pintar System "
+        "2026 Juara Inovasi Pasifik System "
         "· Hak Cipta Terpelihara"
     ),
 
