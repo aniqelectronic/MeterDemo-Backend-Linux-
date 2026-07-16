@@ -746,218 +746,120 @@ def get_all_orders(
     "/iframe-wrapper",
     response_class=HTMLResponse,
 )
-def iframe_wrapper(
-    iframe_url: str,
-    timestamp: str | None = None,
-):
-    """
-    Display the external PegePay payment page inside a local
-    wrapper page.
-
-    The external PegePay page cannot be edited because it is
-    loaded from a different website.
-
-    This wrapper controls:
-        - iframe positioning and scaling
-        - loading screen
-        - QR payment guide
-        - Cancel button
-        - cache headers
-    """
-
+def iframe_wrapper(iframe_url: str):
     html_content = f"""
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
 
-        <title>PegePayQR</title>
+        <title>PegePay QR Payment</title>
 
         <meta
             name="viewport"
-            content="
-                width=device-width,
-                initial-scale=1.0,
-                maximum-scale=1.0,
-                user-scalable=no
-            "
+            content="width=device-width, initial-scale=1.0"
         >
 
         <style>
-            * {{
-                box-sizing: border-box;
-                -webkit-user-select: none;
-                user-select: none;
-            }}
-
-            html,
             body {{
-                width: 100%;
-                height: 100%;
                 margin: 0;
-                padding: 0;
-                overflow: hidden;
                 background: #ffffff;
                 font-family: Arial, sans-serif;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
             }}
-
-            body {{
-                position: relative;
-            }}
-
-            /* =============================================
-               EXTERNAL PEGEpay IFRAME AREA
-               ============================================= */
 
             .iframe-container {{
-                position: absolute;
-                top: 0;
-                left: 0;
-
                 width: 100vw;
                 height: 58vh;
-
                 overflow: hidden;
-                background: #ffffff;
+                display: flex;
+                justify-content: center;
+                align-items: flex-start;
+                background: white;
             }}
 
             .iframe-container iframe {{
-                position: absolute;
-                top: 0;
-                left: 50%;
-
                 width: 1080px;
                 height: 1700px;
-
-                margin: 0;
-                padding: 0;
                 border: none;
-                background: #ffffff;
 
-                /*
-                  This does not change the PegePay website.
-
-                  It only zooms and moves the entire external
-                  iframe inside this wrapper.
-                */
                 transform:
+                    scale(2.0)
                     translateX(-50%)
-                    translateY(-18%)
-                    scale(2.0);
+                    translateY(-18%);
 
-                transform-origin: top center;
+                transform-origin: top left;
             }}
 
-            /* =============================================
-               QR GUIDE
-               ============================================= */
-
             .promo-container {{
-                position: absolute;
+                position: fixed;
+                bottom: 120px;
                 left: 50%;
-                bottom: 125px;
-
-                width: 80vw;
-                max-width: 650px;
-
                 transform: translateX(-50%);
+                z-index: 998;
+                width: 80vw;
                 text-align: center;
-
-                z-index: 20;
             }}
 
             .promo-container img {{
-                display: block;
-
                 width: 100%;
-                max-height: 350px;
-
-                object-fit: contain;
-
+                max-width: 550px;
                 border-radius: 15px;
             }}
 
-            /* =============================================
-               CANCEL BUTTON
-               ============================================= */
-
             .button-container {{
-                position: absolute;
+                position: fixed;
+                bottom: 50px;
                 left: 50%;
-                bottom: 35px;
-
                 transform: translateX(-50%);
-                z-index: 30;
+                z-index: 999;
             }}
 
-            .cancel-button {{
-                width: 320px;
-                height: 70px;
-
-                border: none;
-                border-radius: 14px;
-
-                background: #d32f2f;
-                color: #ffffff;
-
-                font-size: 23px;
-                font-weight: bold;
-
-                cursor: pointer;
-
-                box-shadow:
-                    0 5px 14px rgba(0, 0, 0, 0.25);
+            button {{
+                width: 300px;
+                height: 65px;
+                font-size: 22px;
             }}
 
-            .cancel-button:active {{
-                background: #9a0007;
-                transform: scale(0.98);
+            button:active {{
+                background-color: darkred;
             }}
-
-            /* =============================================
-               LOADER
-               ============================================= */
 
             .loader {{
                 position: fixed;
-                inset: 0;
-
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: white;
                 display: flex;
-                flex-direction: column;
                 justify-content: center;
                 align-items: center;
-
-                background: #ffffff;
-
+                flex-direction: column;
                 z-index: 99999;
             }}
 
             .spinner {{
                 width: 90px;
                 height: 90px;
-
                 border: 10px solid #eeeeee;
                 border-top: 10px solid #0359d2;
                 border-radius: 50%;
-
                 animation: spin 1s linear infinite;
             }}
 
             .loader-text {{
                 margin-top: 20px;
-
-                color: #0359d2;
-
                 font-size: 28px;
                 font-weight: bold;
+                color: #0359d2;
             }}
 
             @keyframes spin {{
-                from {{
-                    transform: rotate(0deg);
-                }}
-
-                to {{
+                100% {{
                     transform: rotate(360deg);
                 }}
             }}
@@ -971,124 +873,57 @@ def iframe_wrapper(
         >
             <div class="spinner"></div>
 
-            <div
-                class="loader-text"
-                id="loaderText"
-            >
+            <div class="loader-text">
                 Loading QR Payment...
             </div>
         </div>
 
         <div class="iframe-container">
-            <iframe
-                id="qrFrame"
-                title="PegePay QR Payment"
-                allow="payment"
-            ></iframe>
+            <iframe id="qrFrame"></iframe>
         </div>
 
         <div class="promo-container">
             <img
                 src="/pegepay/qr-guide"
-                alt="QR Payment Guide"
+                alt="QR Guide"
             >
         </div>
 
         <div class="button-container">
-            <button
-                type="button"
-                class="cancel-button"
-                onclick="cancelPayment()"
-            >
+            <button onclick="cancelPayment()">
                 Batal / Cancel
             </button>
         </div>
 
         <script>
-            /*
-              repr-style insertion makes special characters in
-              the URL safer than manually surrounding it using
-              JavaScript quotes.
-            */
-            const iframeUrl = {iframe_url!r};
-
+            const iframeUrl = "{iframe_url}";
             const iframe =
                 document.getElementById("qrFrame");
-
             const loader =
                 document.getElementById("loader");
 
-            const loaderText =
-                document.getElementById("loaderText");
-
-            let cancelTriggered = false;
-
-            /*
-              Load the external PegePay URL without changing its
-              internal HTML or JavaScript.
-            */
             iframe.src = iframeUrl;
 
-            iframe.onload = function () {{
+            iframe.onload = () => {{
                 loader.style.display = "none";
             }};
 
-            setTimeout(function () {{
-                if (
-                    loader.style.display !== "none"
-                ) {{
-                    loaderText.innerText =
-                        "Still loading QR... please wait";
-                }}
+            setTimeout(() => {{
+                document.querySelector(
+                    ".loader-text"
+                ).innerText =
+                    "Still loading QR... please wait";
             }}, 3000);
 
-            /*
-              Flutter listens for this URL through:
-
-              webview.addOnUrlRequestCallback(...)
-            */
             function cancelPayment() {{
-                if (cancelTriggered) {{
-                    return;
-                }}
-
-                cancelTriggered = true;
-
                 window.location.href =
                     "app://cancelPayment";
             }}
-
-            /*
-              These keyboard events affect only this wrapper.
-
-              They do not alter the external PegePay iframe.
-            */
-            window.addEventListener(
-                "keydown",
-                function (event) {{
-                    if (
-                        event.key === "Escape" ||
-                        event.key === "BrowserBack"
-                    ) {{
-                        event.preventDefault();
-                        cancelPayment();
-                    }}
-                }}
-            );
         </script>
     </body>
     </html>
     """
 
     return HTMLResponse(
-        content=html_content,
-        headers={
-            "Cache-Control": (
-                "no-store, no-cache, must-revalidate, "
-                "proxy-revalidate, max-age=0"
-            ),
-            "Pragma": "no-cache",
-            "Expires": "0",
-            "Surrogate-Control": "no-store",
-        },
+        content=html_content
     )
