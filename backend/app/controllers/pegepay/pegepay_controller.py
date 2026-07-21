@@ -312,6 +312,11 @@ def get_pegepay_token(db: Session):
         )
 
     data = response.json()
+    
+    print("========================================", flush=True)
+    print("[PegePay] TOKEN RESPONSE", flush=True)
+    print(data, flush=True)
+    print("========================================", flush=True)
 
     access_token = data.get("access_token")
     token_expired_at = data.get(
