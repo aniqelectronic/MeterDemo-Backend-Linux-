@@ -465,6 +465,22 @@ def create_order(
         ),
         "Content-Type": "application/json",
     }
+    
+    # =========================================================
+    # DEBUG - OUTGOING REQUEST
+    # =========================================================
+
+    print("========================================", flush=True)
+    print("[PegePay] OUTGOING REQUEST", flush=True)
+    print(f"Store ID    : {payload['store_id']}", flush=True)
+    print(f"Terminal ID : {payload['terminal_id']}", flush=True)
+    print(f"Shift ID    : {payload['shift_id']}", flush=True)
+    print(f"Order No    : {payload['order_no']}", flush=True)
+    print(f"Amount      : {payload['order_amount']}", flush=True)
+    print(f"QR Validity : {payload['qr_validity']}", flush=True)
+    print("Payload:", flush=True)
+    print(payload, flush=True)
+    print("========================================", flush=True)
 
     # First PegePay request.
     try:
@@ -474,6 +490,12 @@ def create_order(
             headers=headers,
             timeout=30,
         )
+        print("========================================", flush=True)
+        print("[PegePay] RESPONSE", flush=True)
+        print(f"Status Code : {response.status_code}", flush=True)
+        print(f"Body        : {response.text}", flush=True)
+        print("========================================", flush=True)
+    
     except requests.RequestException as error:
         raise HTTPException(
             status_code=503,
