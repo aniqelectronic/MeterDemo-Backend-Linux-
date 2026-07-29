@@ -1,4 +1,8 @@
 import uvicorn
+import time
+import psutil
+import os
+
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
@@ -169,6 +173,158 @@ def health_check():
         ],
     }
 
+# =========================================================
+# SYSTEM RESOURCE HEALTH
+# =========================================================
+
+@app.get(
+    "/system-health",
+    tags=["System"],
+)
+def system_health():
+    """
+    Return current Azure VM resource utilization.
+
+    This endpoint reports:
+    - CPU usage
+    - memory usage
+    - swap usage
+    - disk usage
+    - Linux load average
+    - system uptime
+    """
+
+    cpu_percent = psutil.cpu_percent(interval=0.2)
+    cpu_logical_count = psutil.cpu_count(logical=True)
+    cpu_physical_count = psutil.cpu_count(logical=False)
+
+    memory = psutil.virtual_memory()
+    swap = psutil.swap_memory()
+    disk = psutil.disk_usage("/")
+
+    load_1, load_5, load_15 = os.getloadavg()
+
+    boot_time = psutil.boot_time()
+    uptime_seconds = int(time.time() - boot_time)
+
+    uptime_days = uptime_seconds // 86400
+    uptime_hours = (uptime_seconds % 86400) // 3600
+    uptime_minutes = (uptime_seconds % 3600) // 60
+
+    status = "healthy"
+    warnings = []
+
+    if cpu_percent >= 90:
+        status = "critical"
+        warnings.append("CPU usage is critically high.")
+    elif cpu_percent >= 75:
+        status = "warning"
+        warnings.append("CPU usage is high.")
+
+    if memory.percent >= 90:
+        status = "critical"
+        warnings.append("Memory usage is critically high.")
+    elif memory.percent >= 80:
+        if status != "critical":
+            status = "warning"
+        warnings.append("Memory usage is high.")
+
+    if disk.percent >= 90:
+        status = "critical"
+        warnings.append("Disk usage is critically high.")
+    elif disk.percent >= 80:
+        if status != "critical":
+            status = "warning"
+        warnings.append("Disk usage is high.")
+
+    logical_cores = cpu_logical_count or 1
+
+    normalized_load_1 = round(
+        load_1 / logical_cores,
+        2,
+    )
+
+    if normalized_load_1 >= 1.5:
+        status = "critical"
+        warnings.append(
+            "Server load average is critically high."
+        )
+    elif normalized_load_1 >= 1.0:
+        if status != "critical":
+            status = "warning"
+        warnings.append(
+            "Server load average is high."
+        )
+
+    return {
+        "status": status,
+        "service": "TIP Azure Server",
+        "checked_at": time.strftime(
+            "%Y-%m-%d %H:%M:%S",
+            time.localtime(),
+        ),
+        "cpu": {
+            "usage_percent": round(cpu_percent, 2),
+            "physical_cores": cpu_physical_count,
+            "logical_cores": cpu_logical_count,
+        },
+        "memory": {
+            "usage_percent": round(memory.percent, 2),
+            "used_gb": round(
+                memory.used / (1024 ** 3),
+                2,
+            ),
+            "available_gb": round(
+                memory.available / (1024 ** 3),
+                2,
+            ),
+            "total_gb": round(
+                memory.total / (1024 ** 3),
+                2,
+            ),
+        },
+        "swap": {
+            "usage_percent": round(swap.percent, 2),
+            "used_gb": round(
+                swap.used / (1024 ** 3),
+                2,
+            ),
+            "total_gb": round(
+                swap.total / (1024 ** 3),
+                2,
+            ),
+        },
+        "disk": {
+            "usage_percent": round(disk.percent, 2),
+            "used_gb": round(
+                disk.used / (1024 ** 3),
+                2,
+            ),
+            "free_gb": round(
+                disk.free / (1024 ** 3),
+                2,
+            ),
+            "total_gb": round(
+                disk.total / (1024 ** 3),
+                2,
+            ),
+        },
+        "load_average": {
+            "one_minute": round(load_1, 2),
+            "five_minutes": round(load_5, 2),
+            "fifteen_minutes": round(load_15, 2),
+            "normalized_one_minute": normalized_load_1,
+        },
+        "uptime": {
+            "seconds": uptime_seconds,
+            "display": (
+                f"{uptime_days} days, "
+                f"{uptime_hours} hours, "
+                f"{uptime_minutes} minutes"
+            ),
+        },
+        "warnings": warnings,
+    }
 
 # =========================================================
 # LEGACY ROUTES
