@@ -5,9 +5,12 @@ import os
 
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.security.hmac_auth import (
+    require_api_key_and_hmac,
+)
 
 # =========================================================
 # VERSION 1 CONTROLLERS
@@ -467,6 +470,9 @@ app.include_router(
 
 api_v2_router = APIRouter(
     prefix="/api/v2",
+    dependencies=[
+        Depends(require_api_key_and_hmac),
+    ],
 )
 
 api_v2_router.include_router(
