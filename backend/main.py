@@ -147,12 +147,47 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
+    # Browser websites permitted to call this API.
+    allow_origins=[
+        "https://tipintar.juaraipasifik.com",
+    ],
+
+    # Keep False unless browser authentication uses cookies.
+    allow_credentials=False,
+
+    # Current and possible future API methods.
+    allow_methods=[
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "OPTIONS",
+        "HEAD",
+    ],
+
+    # Request headers accepted from browser applications.
+    allow_headers=[
+        "Accept",
+        "Content-Type",
+        "Authorization",
+        "X-API-Key",
+        "X-Timestamp",
+        "X-Nonce",
+        "X-Signature",
+        "Idempotency-Key",
+        "X-Request-ID",
+    ],
+
+    # Optional response headers that browser JavaScript
+    # is permitted to read.
+    expose_headers=[
+        "X-Request-ID",
+    ],
+
+    # Browser may cache the preflight result for 1 hour.
+    max_age=3600,
+)
 
 # =========================================================
 # HEALTH CHECK
