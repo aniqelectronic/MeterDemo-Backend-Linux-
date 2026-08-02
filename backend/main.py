@@ -16,34 +16,34 @@ from app.security.hmac_auth import (
 # VERSION 1 CONTROLLERS
 # =========================================================
 
-from app.controllers.parking import (
-    parking_controller as parking_controller_v1,
-)
+# from app.controllers.parking import (
+#     parking_controller as parking_controller_v1,
+# )
 
-from app.controllers.parking import (
-    transaction_parking_controller
-    as transaction_parking_controller_v1,
-)
+# from app.controllers.parking import (
+#     transaction_parking_controller
+#     as transaction_parking_controller_v1,
+# )
 
-from app.controllers.compound import (
-    compound_controller as compound_controller_v1,
-)
+# from app.controllers.compound import (
+#     compound_controller as compound_controller_v1,
+# )
 
-from app.controllers.tax import (
-    tax_controller as tax_controller_v1,
-)
+# from app.controllers.tax import (
+#     tax_controller as tax_controller_v1,
+# )
 
-from app.controllers.licenses import (
-    licenses_controller as licenses_controller_v1,
-)
+# from app.controllers.licenses import (
+#     licenses_controller as licenses_controller_v1,
+# )
 
-from app.controllers.pegepay import (
-    pegepay_controller as pegepay_controller_v1,
-)
+# from app.controllers.pegepay import (
+#     pegepay_controller as pegepay_controller_v1,
+# )
 
-from app.controllers.sewaan import (
-    sewaan_controller as sewaan_controller_v1,
-)
+# from app.controllers.sewaan import (
+#     sewaan_controller as sewaan_controller_v1,
+# )
 
 
 # =========================================================
@@ -206,7 +206,7 @@ def health_check():
         "service": "TIP Backend",
         "api_versions": [
             "legacy",
-            "v1",
+            # "v1",
             "v2",
         ],
     }
@@ -378,33 +378,33 @@ def system_health():
 # Keep these until all old kiosks have migrated.
 # =========================================================
 
-app.include_router(
-    parking_controller_v1.router
-)
+# app.include_router(
+#     parking_controller_v1.router
+# )
 
-app.include_router(
-    transaction_parking_controller_v1.router
-)
+# app.include_router(
+#     transaction_parking_controller_v1.router
+# )
 
-app.include_router(
-    compound_controller_v1.router
-)
+# app.include_router(
+#     compound_controller_v1.router
+# )
 
-app.include_router(
-    tax_controller_v1.router
-)
+# app.include_router(
+#     tax_controller_v1.router
+# )
 
-app.include_router(
-    licenses_controller_v1.router
-)
+# app.include_router(
+#     licenses_controller_v1.router
+# )
 
-app.include_router(
-    pegepay_controller_v1.router
-)
+# app.include_router(
+#     pegepay_controller_v1.router
+# )
 
-app.include_router(
-    sewaan_controller_v1.router
-)
+# app.include_router(
+#     sewaan_controller_v1.router
+# )
 
 
 # =========================================================
@@ -417,41 +417,41 @@ app.include_router(
 # /api/v1/parking/...
 # =========================================================
 
-api_v1_router = APIRouter(
-    prefix="/api/v1",
-)
+# api_v1_router = APIRouter(
+#     prefix="/api/v1",
+# )
 
-api_v1_router.include_router(
-    parking_controller_v1.router
-)
+# api_v1_router.include_router(
+#     parking_controller_v1.router
+# )
 
-api_v1_router.include_router(
-    transaction_parking_controller_v1.router
-)
+# api_v1_router.include_router(
+#     transaction_parking_controller_v1.router
+# )
 
-api_v1_router.include_router(
-    compound_controller_v1.router
-)
+# api_v1_router.include_router(
+#     compound_controller_v1.router
+# )
 
-api_v1_router.include_router(
-    tax_controller_v1.router
-)
+# api_v1_router.include_router(
+#     tax_controller_v1.router
+# )
 
-api_v1_router.include_router(
-    licenses_controller_v1.router
-)
+# api_v1_router.include_router(
+#     licenses_controller_v1.router
+# )
 
-api_v1_router.include_router(
-    pegepay_controller_v1.router
-)
+# api_v1_router.include_router(
+#     pegepay_controller_v1.router
+# )
 
-api_v1_router.include_router(
-    sewaan_controller_v1.router
-)
+# api_v1_router.include_router(
+#     sewaan_controller_v1.router
+# )
 
-app.include_router(
-    api_v1_router
-)
+# app.include_router(
+#     api_v1_router
+# )
 
 
 # =========================================================
