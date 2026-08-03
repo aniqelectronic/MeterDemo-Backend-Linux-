@@ -945,7 +945,7 @@ def iframe_wrapper(iframe_url: str):
 
         <div class="promo-container">
             <img
-                src="/api/v2/pegepay/qr-guide"
+                src="https://tipintar.juaraipasifik.com/api/v2/pegepay/qr-guide"
                 alt="QR Guide"
             >
         </div>
