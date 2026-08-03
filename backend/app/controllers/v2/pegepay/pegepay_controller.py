@@ -2,6 +2,8 @@ import re
 import requests
 import time
 
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import HTMLResponse, FileResponse
 from sqlalchemy import func
@@ -355,13 +357,31 @@ def get_pegepay_token(db: Session):
 # QR GUIDE IMAGE
 # =========================================================
 
+# @router.get("/qr-guide")
+# def qr_guide():
+#     return FileResponse(
+#         "app/resources/images/qr_guide2.png",
+#         media_type="image/png",
+#     )
+
+
+APP_DIR = Path(__file__).resolve().parents[2]
+QR_GUIDE_IMAGE = APP_DIR / "resources" / "images" / "qr_guide2.png"
+
+
 @router.get("/qr-guide")
 def qr_guide():
-    return FileResponse(
-        "app/resources/images/qr_guide2.png",
-        media_type="image/png",
-    )
+    if not QR_GUIDE_IMAGE.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail=f"QR guide image not found: {QR_GUIDE_IMAGE}",
+        )
 
+    return FileResponse(
+        path=str(QR_GUIDE_IMAGE),
+        media_type="image/png",
+        filename="qr_guide2.png",
+    )
 
 # =========================================================
 # CREATE PEGE PAY ORDER
