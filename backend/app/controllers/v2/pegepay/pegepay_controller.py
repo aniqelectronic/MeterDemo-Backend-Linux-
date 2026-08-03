@@ -365,12 +365,24 @@ def get_pegepay_token(db: Session):
 #     )
 
 
-APP_DIR = Path(__file__).resolve().parents[2]
+APP_DIR = (
+    Path(__file__)
+    .resolve()
+    .parent          # pegepay
+    .parent          # v2
+    .parent          # controllers
+    .parent          # app
+)
+
 QR_GUIDE_IMAGE = APP_DIR / "resources" / "images" / "qr_guide2.png"
 
 
 @router.get("/qr-guide")
 def qr_guide():
+    print("APP DIR:", APP_DIR)
+    print("IMAGE PATH:", QR_GUIDE_IMAGE)
+    print("IMAGE EXISTS:", QR_GUIDE_IMAGE.is_file())
+
     if not QR_GUIDE_IMAGE.is_file():
         raise HTTPException(
             status_code=404,
@@ -380,7 +392,9 @@ def qr_guide():
     return FileResponse(
         path=str(QR_GUIDE_IMAGE),
         media_type="image/png",
-        filename="qr_guide2.png",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+        },
     )
 
 # =========================================================
