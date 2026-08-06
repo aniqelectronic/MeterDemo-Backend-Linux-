@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.controllers.v2.bill.bill_receipt import (
-    generate_bill_receipt,
+    generate_bill_receipt as generate_bill_receipt_pdf,
 )
 from app.utils.blob_upload import upload_to_blob
 
@@ -603,7 +603,7 @@ def generate_bill_receipt_html(
 # =========================================================
 
 @router.post("/receipt/qr")
-def generate_bill_receipt(payload: dict):
+def generate_bill_receipt_qr(payload: dict):
     _validate_payload(payload)
 
     order_no = str(payload.get("order_no")).strip()
@@ -616,7 +616,7 @@ def generate_bill_receipt(payload: dict):
     bill_amount = _safe_float(payload.get("bill_amount"))
     total_amount = _safe_float(payload.get("total_amount"))
 
-    pdf_bytes = generate_bill_receipt(
+    pdf_bytes = generate_bill_receipt_pdf(
         paid_date=paid_date,
         payment_method=payment_method,
         bill_type=bill_type,
