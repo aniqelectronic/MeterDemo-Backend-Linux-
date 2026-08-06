@@ -79,6 +79,9 @@ from app.controllers.v2.sewaan import (
     sewaan_controller as sewaan_controller_v2,
 )
 
+from app.controllers.v2.bill import (
+    bill_receipt_route,
+)
 
 # =========================================================
 # DATABASE AND UTILITIES
@@ -503,9 +506,14 @@ api_v2_router.include_router(
     sewaan_controller_v2.router
 )
 
+api_v2_router.include_router(
+    bill_receipt_route.router
+)
+
 app.include_router(
     api_v2_router
 )
+
 
 
 # =========================================================
