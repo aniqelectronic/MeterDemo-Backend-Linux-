@@ -6,7 +6,6 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import HTMLResponse, FileResponse
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.pegepay.pegepay_model import (
@@ -142,21 +141,38 @@ def generate_pegepay_order_no(
     # Example: KN08100726
     prefix = f"{terminal_code}{date_part}"
 
-    # Count only orders belonging to:
-    # 1. The same terminal code
-    # 2. The same SIRIM date
-    daily_count = (
-        db.query(func.count(PegepayOrder.id))
+    # Read today's existing order numbers and use the highest
+    # three-digit suffix. Counting rows is not safe when a retry
+    # skips a number or an older row is missing.
+    existing_order_numbers = (
+        db.query(PegepayOrder.order_no)
         .filter(
             PegepayOrder.order_no.like(
                 f"{prefix}%"
             )
         )
-        .scalar()
-        or 0
+        .all()
     )
 
-    next_count = daily_count + 1
+    highest_count = 0
+
+    for row in existing_order_numbers:
+        existing_order_no = row[0]
+
+        if not existing_order_no:
+            continue
+
+        suffix = existing_order_no[len(prefix):]
+
+        if len(suffix) != 3 or not suffix.isdigit():
+            continue
+
+        highest_count = max(
+            highest_count,
+            int(suffix),
+        )
+
+    next_count = highest_count + 1
 
     if next_count > 999:
         raise HTTPException(
@@ -569,60 +585,29 @@ def create_order(
     # Use SIRIM time once for this request.
     current_sirim_time = sirim_now_naive()
 
-    # DDMMYY from SIRIM time.
-    date_part = current_sirim_time.strftime(
-        "%d%m%y"
+    # Every displayed QR receives a new order number. Older
+    # unprocessed rows remain untouched in MySQL and are never
+    # reused for another customer or payment attempt.
+    existing_order = None
+
+    order_no = generate_pegepay_order_no(
+        db=db,
+        terminal_id=terminal_code,
+        current_time=current_sirim_time,
     )
 
-    # Example: KN08100726
-    current_day_prefix = (
-        f"{terminal_code}{date_part}"
+    print(
+        "[PegePay] Creating new unique order "
+        f"{order_no} for terminal "
+        f"{actual_terminal_id}",
+        flush=True,
     )
-
-    # Reuse only an unprocessed order from:
-    # 1. The same actual terminal
-    # 2. The same SIRIM date
-    existing_order = (
-        db.query(PegepayOrder)
-        .filter(
-            PegepayOrder.terminal_id
-            == actual_terminal_id,
-            PegepayOrder.order_status
-            == "unprocessed",
-            PegepayOrder.order_no.like(
-                f"{current_day_prefix}%"
-            ),
-        )
-        .order_by(PegepayOrder.id.desc())
-        .first()
-    )
-
-    if existing_order:
-        order_no = existing_order.order_no
-
-        print(
-            "[PegePay] Reusing today's unprocessed "
-            f"order {order_no} for terminal "
-            f"{actual_terminal_id}"
-        )
-    else:
-        order_no = generate_pegepay_order_no(
-            db=db,
-            terminal_id=terminal_code,
-            current_time=current_sirim_time,
-        )
-
-        print(
-            "[PegePay] Creating new order "
-            f"{order_no} for terminal "
-            f"{actual_terminal_id}"
-        )
 
     payload = {
         "order_output": "online",
         "image_file_format": "png",
         "order_no": order_no,
-        "override_existing_unprocessed_order_no": "yes",
+        "override_existing_unprocessed_order_no": "no",
         "order_amount": str(body.order_amount),
         "qr_validity": str(body.qr_validity),
         "store_id": body.store_id,
@@ -666,14 +651,6 @@ def create_order(
             "[PegePay] First order was rejected. "
             "Generating a new SIRIM-based order number."
         )
-
-        if existing_order:
-            print(
-                "[PegePay] Existing order was rejected and "
-                "will not be marked successful: "
-                f"{existing_order.order_no}",
-                flush=True,
-            )
 
         # Generate a different retry order number.
         new_order_no = generate_retry_order_no(
@@ -734,33 +711,17 @@ def create_order(
             .get("iframe_url")
         )
 
-        if existing_order:
-            existing_order.order_amount = (
-                body.order_amount
-            )
-            existing_order.store_id = body.store_id
-            existing_order.terminal_id = (
-                actual_terminal_id
-            )
-            existing_order.order_status = (
-                "unprocessed"
-            )
+        new_order = PegepayOrder(
+            order_no=order_no,
+            order_amount=body.order_amount,
+            order_status="unprocessed",
+            store_id=body.store_id,
+            terminal_id=actual_terminal_id,
+        )
 
-            db.commit()
-            db.refresh(existing_order)
-
-        else:
-            new_order = PegepayOrder(
-                order_no=order_no,
-                order_amount=body.order_amount,
-                order_status="unprocessed",
-                store_id=body.store_id,
-                terminal_id=actual_terminal_id,
-            )
-
-            db.add(new_order)
-            db.commit()
-            db.refresh(new_order)
+        db.add(new_order)
+        db.commit()
+        db.refresh(new_order)
 
     if not iframe_url:
         raise HTTPException(
