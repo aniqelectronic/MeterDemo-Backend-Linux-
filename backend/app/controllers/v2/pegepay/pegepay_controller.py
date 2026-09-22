@@ -259,7 +259,10 @@ def generate_retry_order_no(
 # PEGE PAY TOKEN
 # =========================================================
 
-def get_pegepay_token(db: Session):
+def get_pegepay_token(
+    db: Session,
+    force_refresh: bool = False,
+):
     """
     Return a valid PegePay access token.
 
@@ -277,6 +280,8 @@ def get_pegepay_token(db: Session):
 
     # Existing token is still valid.
     if (
+        not force_refresh
+        and
         token_entry
         and current_time_ms
         < token_entry.token_expired_at
@@ -313,12 +318,13 @@ def get_pegepay_token(db: Session):
             detail=response.text,
         )
 
-    data = response.json()
-    
-    print("========================================", flush=True)
-    print("[PegePay] TOKEN RESPONSE", flush=True)
-    print(data, flush=True)
-    print("========================================", flush=True)
+    try:
+        data = response.json()
+    except ValueError as error:
+        raise HTTPException(
+            status_code=502,
+            detail="PegePay token service returned invalid JSON",
+        ) from error
 
     access_token = data.get("access_token")
     token_expired_at = data.get(
@@ -334,6 +340,14 @@ def get_pegepay_token(db: Session):
                 "the PegePay response"
             ),
         )
+
+    try:
+        token_expired_at = int(token_expired_at)
+    except (TypeError, ValueError) as error:
+        raise HTTPException(
+            status_code=502,
+            detail="PegePay returned an invalid token expiry",
+        ) from error
 
     if token_entry:
         token_entry.access_token = access_token
@@ -351,6 +365,126 @@ def get_pegepay_token(db: Session):
     db.refresh(token_entry)
 
     return access_token
+
+
+def pegepay_post_with_token_retry(
+    *,
+    db: Session,
+    url: str,
+    payload: dict,
+    timeout: int = 30,
+):
+    """
+    Send an authenticated POST request to PegePay.
+
+    If PegePay rejects the cached bearer token with HTTP 401 or
+    403, force-refresh it and retry the original request once.
+    """
+
+    def send_request(access_token: str):
+        return requests.post(
+            url,
+            json=payload,
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            timeout=timeout,
+        )
+
+    def is_invalid_token_response(response) -> bool:
+        """
+        PegePay may report an invalid token in two ways:
+
+        1. HTTP status 401 or 403.
+        2. HTTP 200 with a JSON body such as:
+           {
+               "status": "failure",
+               "message": "invalid token",
+               "code": 403
+           }
+        """
+        if response.status_code in (401, 403):
+            return True
+
+        try:
+            response_data = response.json()
+        except ValueError:
+            return False
+
+        if not isinstance(response_data, dict):
+            return False
+
+        status = str(
+            response_data.get("status", "")
+        ).strip().lower()
+
+        message = str(
+            response_data.get("message", "")
+        ).strip().lower()
+
+        try:
+            response_code = int(
+                response_data.get("code", 0)
+            )
+        except (TypeError, ValueError):
+            response_code = 0
+
+        return (
+            response_code in (401, 403)
+            or "invalid token" in message
+            or (
+                status == "failure"
+                and "token" in message
+            )
+        )
+
+    access_token = get_pegepay_token(db)
+
+    try:
+        response = send_request(access_token)
+    except requests.RequestException as error:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Unable to connect to PegePay: {error}",
+        ) from error
+
+    if not is_invalid_token_response(response):
+        return response
+
+    print(
+        "[PegePay] Bearer token rejected. "
+        "Refreshing and retrying once.",
+        flush=True,
+    )
+
+    new_access_token = get_pegepay_token(
+        db,
+        force_refresh=True,
+    )
+
+    try:
+        retry_response = send_request(new_access_token)
+    except requests.RequestException as error:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Unable to connect to PegePay after token "
+                f"refresh: {error}"
+            ),
+        ) from error
+
+    if is_invalid_token_response(retry_response):
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "PegePay rejected the newly refreshed bearer "
+                "token. Check the configured refresh token."
+            ),
+        )
+
+    return retry_response
 
 
 # =========================================================
@@ -496,15 +630,6 @@ def create_order(
         "shift_id": body.shift_id,
     }
 
-    access_token = get_pegepay_token(db)
-
-    headers = {
-        "Authorization": (
-            f"Bearer {access_token}"
-        ),
-        "Content-Type": "application/json",
-    }
-    
     # =========================================================
     # DEBUG - OUTGOING REQUEST
     # =========================================================
@@ -522,27 +647,18 @@ def create_order(
     print("========================================", flush=True)
 
     # First PegePay request.
-    try:
-        response = requests.post(
-            PEPAY_ORDER_URL,
-            json=payload,
-            headers=headers,
-            timeout=30,
-        )
-        print("========================================", flush=True)
-        print("[PegePay] RESPONSE", flush=True)
-        print(f"Status Code : {response.status_code}", flush=True)
-        print(f"Body        : {response.text}", flush=True)
-        print("========================================", flush=True)
-    
-    except requests.RequestException as error:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Unable to connect to PegePay "
-                f"order service: {error}"
-            ),
-        ) from error
+    response = pegepay_post_with_token_retry(
+        db=db,
+        url=PEPAY_ORDER_URL,
+        payload=payload,
+        timeout=30,
+    )
+
+    print("========================================", flush=True)
+    print("[PegePay] RESPONSE", flush=True)
+    print(f"Status Code : {response.status_code}", flush=True)
+    print(f"Body        : {response.text}", flush=True)
+    print("========================================", flush=True)
 
     # PegePay rejected the first order.
     if response.status_code != 200:
@@ -552,12 +668,11 @@ def create_order(
         )
 
         if existing_order:
-            existing_order.order_status = "successful"
-            db.commit()
-
             print(
-                "[PegePay] Marked previous order "
-                f"{existing_order.order_no} as successful."
+                "[PegePay] Existing order was rejected and "
+                "will not be marked successful: "
+                f"{existing_order.order_no}",
+                flush=True,
             )
 
         # Generate a different retry order number.
@@ -575,21 +690,12 @@ def create_order(
 
         payload["order_no"] = new_order_no
 
-        try:
-            retry_response = requests.post(
-                PEPAY_ORDER_URL,
-                json=payload,
-                headers=headers,
-                timeout=30,
-            )
-        except requests.RequestException as error:
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    "Unable to connect to PegePay "
-                    f"during retry: {error}"
-                ),
-            ) from error
+        retry_response = pegepay_post_with_token_retry(
+            db=db,
+            url=PEPAY_ORDER_URL,
+            payload=payload,
+            timeout=30,
+        )
 
         if retry_response.status_code != 200:
             raise HTTPException(
@@ -687,34 +793,16 @@ def check_order_status(
     that the payment was successful.
     """
 
-    access_token = get_pegepay_token(db)
-
-    headers = {
-        "Authorization": (
-            f"Bearer {access_token}"
-        ),
-        "Content-Type": "application/json",
-    }
-
     payload = {
         "order_no": body.order_no,
     }
 
-    try:
-        response = requests.post(
-            PEPAY_STATUS_URL,
-            json=payload,
-            headers=headers,
-            timeout=30,
-        )
-    except requests.RequestException as error:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Unable to connect to PegePay "
-                f"status service: {error}"
-            ),
-        ) from error
+    response = pegepay_post_with_token_retry(
+        db=db,
+        url=PEPAY_STATUS_URL,
+        payload=payload,
+        timeout=30,
+    )
 
     if response.status_code != 200:
         raise HTTPException(
